@@ -13,6 +13,9 @@
 > **Harness KB** is a small, dependency-free blueprint — plus reference artifacts — for a KB
 > that keeps *itself* correct, fresh, and fast to retrieve. It is the architecture, not an app.
 
+_Provenance: this blueprint reflects a real working system as of **2026-07-24**. The concepts are
+evergreen; any specific counts are illustrative snapshots, not live values._
+
 ---
 
 ## The one idea

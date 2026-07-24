@@ -131,6 +131,7 @@ def main():
     rel_lookup = {str(p.relative_to(vault)).replace("\\", "/").lower(): p for p in all_files}
 
     referenced_images = set()
+    heading_cache = {}
     problems = []  # (severity, note_rel, message)
 
     def resolve(target, note):
@@ -149,6 +150,15 @@ def main():
         hits = by_stem.get(stem) or by_stem.get(Path(norm).stem)
         return hits[0] if hits else None
 
+    def headings_of(path):
+        if path not in heading_cache:
+            _, b = parse_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
+            heading_cache[path] = {
+                re.sub(r"^#+\s+", "", ln).strip().lower()
+                for ln in b.splitlines() if re.match(r"^#{1,6}\s", ln)
+            }
+        return heading_cache[path]
+
     for note in notes:
         rel = str(note.relative_to(vault)).replace("\\", "/")
         text = note.read_text(encoding="utf-8", errors="replace")
@@ -163,6 +173,7 @@ def main():
         for embed, target in WIKILINK.findall(text):
             dest = resolve(target, note)
             clean = target.split("#", 1)[0].split("|", 1)[0].strip()
+            anchor = target.split("#", 1)[1].split("|", 1)[0].strip() if "#" in target else ""
             if embed == "!":
                 if dest is None or dest.suffix.lower() not in img_exts:
                     problems.append(("ERR", rel, f"broken image embed: [[{target}]]"))
@@ -173,6 +184,9 @@ def main():
                     problems.append(("ERR", rel, f"broken note link: [[{target}]]"))
                 elif dest is not None and dest.suffix.lower() in img_exts:
                     referenced_images.add(dest)
+                elif anchor and not anchor.startswith("^") and dest is not None and dest.suffix.lower() == ".md":
+                    if anchor.lower() not in headings_of(dest):
+                        problems.append(("ERR", rel, f"broken anchor: [[{target}]] (no heading '{anchor}')"))
 
         if gate_ignore:
             continue

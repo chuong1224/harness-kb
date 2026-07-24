@@ -5,6 +5,10 @@
 > deliberately tool-agnostic — the KB is just a folder of Markdown notes; the ideas apply
 > whether you drive it with an editor, a script, or an autonomous agent.
 
+*Provenance: this blueprint reflects a real working system as of **2026-07-24**. The concepts are
+evergreen; any specific counts mentioned (e.g. tag or index totals) are illustrative snapshots
+from that date, not live values.*
+
 ---
 
 ## 1. The goal: a KB that runs itself
@@ -54,9 +58,9 @@ Score any KB honestly. The first six properties are the *scaffolding*; the seven
 | **Multi-agent coordination** | Multiple agents share the KB without clobbering each other | Usually by convention |
 | **Closed control loop** | The system corrects itself; it does not only report | **Rarely reached** |
 
-A common, honest self-assessment: ~85% on scaffolding + guardrails, ~30% on self-closing loops.
-You have built an excellent *cockpit and safety rig*; what remains is letting the machine **hold
-itself on the rails**.
+A common, honest self-assessment in a maturing system: near-complete on scaffolding and
+guardrails, but only a fraction of the top-level loops actually close. You have built an excellent
+*cockpit and safety rig*; what remains is letting the machine **hold itself on the rails**.
 
 ---
 
@@ -83,8 +87,8 @@ If most of your top-level loops sense-and-report, you have a cockpit. That is th
 
 A recurring failure mode: **rules duplicated across many documents drift apart.** An audit that
 checks the KB against its own rules will eventually catch its *rules* disagreeing with each other
-— e.g. one doc says the controlled vocabulary has 14 tags, another says 15; one says 26 indexes,
-another 27. The audit catching the drift is good. But the drift **keeps recurring** because there
+— for example, one document might claim the tag vocabulary has 14 entries while another says 15,
+or one counts 26 indexes and another 27. The audit catching the drift is good. But the drift **keeps recurring** because there
 is no single generated source.
 
 > **A real harness has exactly ONE source of truth.** Every countable, enumerable fact (the tag
