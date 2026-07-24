@@ -1,0 +1,37 @@
+{
+  "_comment": "Single source of truth for a Harness KB. Every ENUMERABLE rule lives here; documents and gates DERIVE from this file instead of hand-copying values that drift apart. See docs/blueprint.md section 5 (H1). Replace the example vocabulary/areas with your own.",
+  "version": 1,
+  "areas": [
+    { "id": "research", "path": "Research", "description": "Technical research notes" },
+    { "id": "projects", "path": "Projects", "description": "Active project documents" },
+    { "id": "skills",   "path": "Skills",   "description": "Reusable skills and how-tos" },
+    { "id": "ops",      "path": "Ops",      "description": "Operations and maintenance" },
+    { "id": "personal", "path": "Personal", "description": "Personal documents" }
+  ],
+  "tags": {
+    "controlled_vocabulary": ["research", "project", "skill", "ops", "personal", "reference", "index"],
+    "index_only_tag": "index",
+    "rules": {
+      "index_files_have_only_the_index_tag": true,
+      "no_single_use_tags": true
+    }
+  },
+  "frontmatter": {
+    "required": ["title", "aliases", "summary", "tags"],
+    "optional": ["date", "updated", "type", "source", "file_digest"],
+    "types": ["reference", "index", "project", "data"]
+  },
+  "structure": {
+    "note_folder_pattern": "one folder per note, with an attachments/ subfolder",
+    "index_filename_pattern": "Index - <Folder Name>",
+    "index_required_when_folder_has_at_least_n_notes": 2
+  },
+  "attachments": {
+    "binary_extensions_requiring_digest": [".xlsx", ".xls", ".csv", ".pdf", ".docx", ".pptx"],
+    "image_extensions": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"]
+  },
+  "scan": {
+    "exclude_dirs": [".git", ".obsidian", "node_modules"],
+    "exclude_dir_prefixes": [".", "_"]
+  }
+}
