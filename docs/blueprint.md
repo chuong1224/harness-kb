@@ -5,7 +5,7 @@
 > deliberately tool-agnostic — the KB is just a folder of Markdown notes; the ideas apply
 > whether you drive it with an editor, a script, or an autonomous agent.
 
-*Provenance: this blueprint reflects a real working system as of **2026-07-24**. The concepts are
+*Provenance: this blueprint reflects a real working system as of **2026-07-25**. The concepts are
 evergreen; any specific counts mentioned (e.g. tag or index totals) are illustrative snapshots
 from that date, not live values.*
 

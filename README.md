@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -14,7 +14,7 @@
 > **Harness KB** is a small, dependency-free blueprint — plus reference artifacts — for a KB
 > that keeps *itself* correct, fresh, and fast to retrieve. It is the architecture, not an app.
 
-_Provenance: this blueprint reflects a real working system as of **2026-07-24**. The concepts are
+_Provenance: this blueprint reflects a real working system as of **2026-07-25**. The concepts are
 evergreen; any specific counts are illustrative snapshots, not live values._
 
 ---

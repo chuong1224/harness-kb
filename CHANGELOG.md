@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-07-25
+
+### Changed
+- Provenance lines in the README and blueprint now date the snapshot to the release that
+  introduced the drift checker, so the "reflects a real working system as of" claim is accurate.
+
 ## [1.2.0] - 2026-07-25
 
 ### Added
@@ -51,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.2.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.2.1
 [1.2.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.2.0
 [1.1.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.1.0
 [1.0.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.0.0
