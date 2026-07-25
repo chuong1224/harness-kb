@@ -33,5 +33,43 @@
   "scan": {
     "exclude_dirs": [".git", ".obsidian", "node_modules"],
     "exclude_dir_prefixes": [".", "_"]
+  },
+  "documents": {
+    "_comment": "Documents that RESTATE the enumerable facts above. They keep the numbers for human readers, but each such line carries a marker comment (e.g. <!-- rules:tag_count -->) so check_rules_drift.py can compare it with this file instead of comparing hand-copied lists against each other.",
+    "marker_prefix": "rules",
+    "claim_types": {
+      "tag_count": {
+        "description": "Size of the controlled vocabulary",
+        "source": "tag_count",
+        "patterns": ["(\\d+)\\s*tags?\\b"]
+      },
+      "area_count": {
+        "description": "Number of declared areas",
+        "source": "area_count",
+        "patterns": ["(\\d+)\\s*areas?\\b"]
+      },
+      "index_count": {
+        "description": "Number of index files, counted from the filesystem",
+        "source": "index_count",
+        "patterns": ["(\\d+)\\s*index(?:es|s)?\\b"]
+      },
+      "tag_list": {
+        "description": "This document enumerates the whole vocabulary; a missing tag is an error",
+        "kind": "list"
+      }
+    },
+    "consumers": [
+      {
+        "path": "Ops/Vault Rules/Vault Rules.md",
+        "role": "rules-summary",
+        "expect": ["tag_count", "tag_list", "area_count", "index_count"]
+      }
+    ],
+    "retired_tags": ["dashboard", "guide", "moc"],
+    "scan_heuristics": {
+      "_comment": "Noise control for the sweep over UNMARKED numbers. min_value: anything smaller is prose ('index files carry 1 tag only'), not a count. retired_mention_ok: a line that mentions a retired tag in order to say it was dropped is fine.",
+      "min_value": { "tag": 3, "area": 2, "index": 2 },
+      "retired_mention_ok": ["retired", "removed", "dropped", "no longer"]
+    }
   }
 }

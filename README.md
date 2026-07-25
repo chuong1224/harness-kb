@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -63,6 +63,8 @@ harness-kb/
 ├── examples/
 │   ├── rules/rules.example.json  Single source of truth for tags/areas (the H1 pattern)
 │   ├── scripts/verify_kb.py      Integrity gate — the "verify" step of the loop (zero deps)
+│   ├── scripts/check_rules_drift.py  Documents vs. the source of truth — kills rule drift (H1)
+│   ├── scripts/test_drift_check.py   Break-the-gate tests for the drift checker
 │   ├── scripts/generate_catalog.py  Triage catalog generator for agent retrieval (zero deps)
 │   ├── hooks/settings.json       Example activity-logging hook (Claude Code PostToolUse)
 │   └── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
@@ -80,12 +82,18 @@ The scripts run on any folder of Markdown notes (a "vault"). Python 3.8+, no pac
 # 1. Check integrity — the verify gate of the control loop
 python examples/scripts/verify_kb.py /path/to/your/vault --rules examples/rules/rules.example.json
 
-# 2. Generate a triage catalog agents can read before searching
+# 2. Check that your documents still agree with the source of truth (no rule drift)
+python examples/scripts/check_rules_drift.py /path/to/your/vault --rules examples/rules/rules.example.json
+
+# 3. Generate a triage catalog agents can read before searching
 python examples/scripts/generate_catalog.py /path/to/your/vault --out catalog.json
 ```
 
-`verify_kb.py` exits `0` when clean and `1` when it finds problems — so you can wire it into a
-commit hook or a scheduled job as a hard gate.
+Both checkers exit `0` when clean and `1` when they find problems — so you can wire them into a
+commit hook or a scheduled job as a hard gate. Point them at `examples/demo-vault` to see real
+output immediately: zero errors, plus a few warnings, because the example rules deliberately declare
+more areas and tags than the six-note demo actually uses — which is exactly the signal you want when
+a vocabulary entry stops being used.
 
 ---
 

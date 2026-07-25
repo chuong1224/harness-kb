@@ -18,14 +18,25 @@ the content-integrity loop in the Harness KB blueprint.
    python scripts/verify_kb.py "<VAULT_PATH>" --rules rules/rules.example.json
    ```
 
-2. Read the rule documents and check them against the **single source of truth**
-   (`rules.example.json`). Flag any place where an enumerable fact (tag vocabulary, index count,
-   area list) disagrees with the source. This is how you catch the KB's own rules drifting apart.
+2. Run the rule-drift check and capture its output — this is the mechanical half of "are the KB's
+   own rules still consistent with each other?", so do not eyeball it by hand:
 
-3. For rules that need judgment (translation quality, semantic tag fit, "cover summary" coverage),
+   ```bash
+   python scripts/check_rules_drift.py "<VAULT_PATH>" --rules rules/rules.example.json --json
+   ```
+
+   Every `DRIFT` entry goes straight into the conflicts section of the report with its `file:line`.
+   Warnings are worth reading but do not fail the run.
+
+3. Read the rule documents for anything the checker cannot see: a *new* enumerable fact stated
+   without a marker, a list that is technically complete but misleading, a rule whose wording now
+   contradicts another document. Register genuinely new claims in the rules file instead of
+   describing the drift again tomorrow.
+
+4. For rules that need judgment (translation quality, semantic tag fit, "cover summary" coverage),
    assess them yourself and note anything suspicious.
 
-4. Overwrite the report note (e.g. `Audit Report`) with a checklist:
+5. Overwrite the report note (e.g. `Audit Report`) with a checklist:
    - Contract violations (from the gate)
    - Soft suggestions
    - Rule conflicts / stale rules

@@ -100,17 +100,50 @@ This is the highest-leverage, lowest-risk fix, and it is a prerequisite for safe
 *correction* (§6, §7). See `examples/rules/rules.example.json` for the data-as-source pattern and
 `examples/scripts/verify_kb.py` for a gate that checks notes against that single source.
 
+### Documents may show the numbers - they just may not own them
+
+The naive reading of "one source of truth" is to strip every count out of your prose. Do not: readers
+and agents genuinely want "the vocabulary has 7 tags" in the document they are already reading. The
+fix is not to delete the copy, it is to **stop letting the copy be authoritative**.
+
+Mark each restating line with a comment naming the claim it makes:
+
+```markdown
+## Tag vocabulary (7 tags) <!-- rules:tag_count -->
+## Index hierarchy (12 indexes) <!-- rules:index_count -->
+```
+
+The marker is an HTML comment: invisible when rendered, trivial to grep, and it survives editing by
+humans and agents alike. A checker then reads each registered document, extracts the marked claims,
+and compares them with the source - **policy** values as authored (vocabulary, areas) and
+**filesystem** values as counted (index count). Drift is reported as `file:line`, so nobody has to
+hunt for which of five copies is wrong. `examples/scripts/check_rules_drift.py` is a working
+implementation; `examples/scripts/test_drift_check.py` breaks it on purpose to prove it catches drift.
+
+Two properties matter more than the implementation:
+
+- **The registry is explicit.** The rules file lists which documents restate which claims, so
+  *deleting* a marker is itself an error. Drift cannot hide by removing the evidence.
+- **Detection is separate from correction.** The checker never edits a document. It only makes the
+  numbers impossible to break silently - which is exactly the precondition H2 needs before anything
+  is allowed to rewrite them (§7, rule 4).
+
 ---
 
 ## 6. Roadmap: closing the loops
 
 Not "add more gauges" — **close the loop.** Ordered by return-on-investment vs. risk.
 
-### H1 — One source of truth for enumerable rules  ⭐ *(do this first)*
+### H1 — One source of truth for enumerable rules  ⭐ *(do this first; reference implementation included)*
 Put every countable fact (tag vocabulary, area list, index count) in **one data file**. Make every
 document *derive* from it, and have the audit compare notes against that source directly rather
 than comparing hand-copied lists against each other. This kills the entire class of "14 vs 15"
 drift at the root.
+
+**Shipped here:** `examples/rules/rules.example.json` (the source, with a registry of which documents
+restate which claims) + `examples/scripts/check_rules_drift.py` (the checker, exit 1 on drift) +
+`examples/scripts/test_drift_check.py` (break-the-gate tests). See §5 for the marker pattern.
+Wire the checker into the daily audit and the class of drift stops being something a human notices.
 
 ### H2 — Promote the audit from "report" to "safe auto-fix"
 For **mechanical, reversible** errors (broken links, missing frontmatter fields, count mismatches,
