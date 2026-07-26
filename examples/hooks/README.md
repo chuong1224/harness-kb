@@ -1,12 +1,13 @@
-# Hooks: the observability leg and the coordination leg
+# Hooks: what the harness owns so the agent doesn't have to remember
 
 `settings.json` is an example [Claude Code](https://docs.claude.com/en/docs/claude-code) hook
-configuration wiring two things the harness should own rather than ask an agent to remember:
+configuration wiring three things the harness should own rather than ask an agent to remember:
 
 | Hook | What it does |
 |---|---|
 | `PostToolUse` | Every read/search/edit appends an event to an activity log — **observability** |
 | `PreToolUse` + `SessionEnd` | Every write first claims the file, and blocks if another agent stream holds it — **coordination** (`claim.py`, blueprint H4) |
+| `Stop` | When tooling changed during the turn, its test suites run; red blocks the turn from ending — **verification** (`tooling_selfcheck.py`) |
 
 ## Activity logging (the observability leg)
 
@@ -80,3 +81,31 @@ append-only `_events-<host>.jsonl` recording the rare events (a block, a takeove
 file is what makes this safe inside a synced folder — see blueprint §6 H4 for the reasoning, and
 `../scripts/test_claim.py` for the 25 cases that prove it blocks when it should and stays quiet
 when it shouldn't.
+
+---
+
+## The tooling gate (the verification leg)
+
+The `Stop` entry runs [`../scripts/tooling_selfcheck.py`](../scripts/tooling_selfcheck.py) at the
+end of every turn. It exists because of a question the other two legs raise: the scripts keeping
+your KB honest have tests — **who runs them?**
+
+- Nothing in the tooling changed since the last green run → it exits in ~0.2s having done nothing.
+- Tooling changed and every suite passes → it records a new green marker and lets the turn end.
+- Tooling changed and a suite is **red** → exit 2, which blocks the turn from ending and hands the
+  failure to the model to fix.
+
+The suite is **discovered**, never listed: any `*/attachments/test_*.py` in the vault is in it. A
+list you must remember to append to is the same failure mode one level up.
+
+```bash
+python examples/scripts/tooling_selfcheck.py list          # what would run, and what has no test
+python examples/scripts/tooling_selfcheck.py run           # run everything now
+python examples/scripts/tooling_selfcheck.py run --if-stale  # what the hook calls
+```
+
+Two properties to keep if you reimplement it: a **red run must not update the green marker** (or
+the gate goes quiet exactly when it matters), and the hook must **never block twice in one turn**
+— `stop_hook_active` in the payload tells you it already did. See `../scripts/test_tooling_selfcheck.py`
+for the 20 cases, including the one that matters most: a mistyped `--vault` used to find no suites,
+report green, and silence the gate forever.

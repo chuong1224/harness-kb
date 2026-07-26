@@ -28,6 +28,19 @@
         ]
       }
     ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/tooling_selfcheck.py\" hook-stop",
+            "shell": "bash",
+            "timeout": 360,
+            "statusMessage": "tooling gate: running suites if tooling changed"
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "hooks": [

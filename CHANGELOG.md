@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-26
+
+### Added
+- `examples/scripts/tooling_selfcheck.py`: **the gate that runs the gates**. Once the checkers live
+  inside the vault, their test suites need someone to run them — and "whoever remembers" is
+  documentation, not a gate. This runner **discovers** every `*/attachments/test_*.py` (no
+  hand-maintained list, which is the same failure mode one level up) and a `Stop` hook calls it at
+  the end of each turn: nothing changed → it exits in ~0.2s; tooling changed and a suite is red →
+  exit 2, blocking the turn until it is fixed.
+- `examples/scripts/test_tooling_selfcheck.py`: 20 break-the-gate cases — discovery scope, real
+  execution, the stale marker, timeouts, the `Stop` hook blocking and refusing to block twice, the
+  kill switch, and the one that matters most: a mistyped `--vault` must not report a false green.
+- Hook example gained the `Stop` entry, and `examples/hooks/README.md` now documents all three legs
+  it wires: observability (logging), coordination (the claim lock), verification (the tooling gate).
+
+### Changed
+- Blueprint §5 gained **"A gate nobody runs is not a gate"**: why an unrun suite fails silently
+  rather than loudly, the four properties that make an automatic gate survivable (discover the
+  suite, do nothing when nothing changed, never record success on a red run, fail open and never
+  trap a session), and the false-green bug that made the last one concrete — the dangerous failure
+  mode of a gate is not a false alarm, it is quiet reassurance.
+
 ## [1.4.0] - 2026-07-26
 
 ### Added

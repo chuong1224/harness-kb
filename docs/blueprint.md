@@ -167,6 +167,35 @@ artifact the old tool produced and reconcile until only genuine content changes 
 conventions surface fast that way: slug truncation limits, whether headings include the H1, what a
 missing frontmatter field defaults to.
 
+### A gate nobody runs is not a gate
+
+Moving the tooling inside the vault raises the next question immediately: those scripts have tests —
+**who runs them?** If the answer is "whoever remembers", you have written documentation, not a gate.
+A suite nobody runs does not fail loudly; it stops being evidence, silently, and you discover months
+later that the check you trusted has been vacuous for weeks.
+
+Wire the suites to something the runtime already does. An end-of-turn hook works well: it is
+frequent, it is automatic, and it is a natural place to refuse — *this turn is not finished while a
+tool you just edited has a failing test.* `examples/scripts/tooling_selfcheck.py` is that gate, and
+four properties are what make it survivable rather than merely strict:
+
+- **Discover the suite, never list it.** Anything matching `attachments/test_*.py` is in. A list you
+  must remember to append to is the same failure mode one level up — and hand-maintained file lists
+  have already bitten this project twice.
+- **Do nothing when nothing changed.** Fingerprint every tooling file (tools included — editing a
+  tool invalidates yesterday's green run as much as editing its test) and compare against the last
+  **green** run. The common path costs a fifth of a second, which is why nobody wants it removed.
+- **A red run must not record success.** Otherwise the gate goes quiet immediately after the first
+  failure, precisely when it should be loudest.
+- **Fail open, and never trap.** Unknown input, no vault, runner crash → allow. Already blocked once
+  this turn → report but let it end. A gate that can strand a session is a gate someone disables
+  permanently, and then you have nothing.
+
+The bug that made all this concrete: an early version accepted `--vault` without validating it. A
+mistyped path found no suites, reported green, and wrote a green marker — after which the gate stayed
+silent forever. **The dangerous failure mode of a gate is not a false alarm, it is quiet
+reassurance.** Test for that case explicitly.
+
 ---
 
 ## 6. Roadmap: closing the loops
