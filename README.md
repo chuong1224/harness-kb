@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -65,7 +65,7 @@ harness-kb/
 │   ├── scripts/verify_kb.py      Integrity gate — the "verify" step of the loop (zero deps)
 │   ├── scripts/check_rules_drift.py  Documents vs. the source of truth — kills rule drift (H1)
 │   ├── scripts/test_drift_check.py   Break-the-gate tests for the drift checker
-│   ├── scripts/generate_catalog.py  Triage catalog generator for agent retrieval (zero deps)
+│   ├── scripts/generate_catalog.py  Triage catalog for agent retrieval — `--check` gates staleness
 │   ├── hooks/settings.json       Example activity-logging hook (Claude Code PostToolUse)
 │   └── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
 └── LICENSE
@@ -87,7 +87,14 @@ python examples/scripts/check_rules_drift.py /path/to/your/vault --rules example
 
 # 3. Generate a triage catalog agents can read before searching
 python examples/scripts/generate_catalog.py /path/to/your/vault --out catalog.json
+
+# ...and gate it: exit 1 when the catalog no longer matches the notes
+python examples/scripts/generate_catalog.py /path/to/your/vault --out catalog.json --check
 ```
+
+> **Put these scripts inside the vault they serve.** A machine with the notes but without the tools
+> cannot verify or regenerate anything, and a second copy kept in per-machine config drifts from the
+> first with no audit able to see it. That failure grows with every machine you add — blueprint §5.
 
 Both checkers exit `0` when clean and `1` when they find problems — so you can wire them into a
 commit hook or a scheduled job as a hard gate. Point them at `examples/demo-vault` to see real
@@ -112,6 +119,12 @@ tự giữ mình **đúng — tươi — truy xuất nhanh**. Đây là *kiến 
 chưa phải harness. Harness thật là một **vòng điều khiển khép kín**: cảm biến độ lệch → quyết
 định → tự chỉnh → xác minh → giữ trên đường ray, với can thiệp người tối thiểu. Mục tiêu: đưa
 con người từ *người vận hành* thành *người giám sát* chỉ phê duyệt thay đổi rủi ro cao.
+
+**Một luật kiến trúc đáng nhớ:** script kiểm tra / sinh dữ liệu phải nằm **trong chính vault**, không
+để trong thư mục cấu hình của từng máy. Máy có note mà thiếu công cụ thì không verify hay regen được
+gì; bản sao thứ hai ở máy khác thì tự do lệch đi mà audit không thấy — vì audit chỉ quét vault. Hai
+máy còn vá tay được; nhiều máy thì số bản sao tăng tuyến tính còn khả năng chúng khớp nhau thì
+không. Phép thử: **clone vault sang máy trắng — chạy gate được không?**
 
 Chi tiết đầy đủ: **[docs/blueprint.md](./docs/blueprint.md)** (tiếng Anh).
 

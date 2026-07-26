@@ -11,8 +11,13 @@ Regenerate it after every edit (and on a schedule) so it never goes stale.
 
 Zero dependencies: Python 3.8+, standard library only.
 
+Keep this script inside the vault it serves (blueprint §5): a machine that has the notes but
+not the generator cannot refresh the catalog, and a second copy living in per-machine config is
+free to drift from the first without any audit noticing.
+
 Usage:
     python generate_catalog.py /path/to/vault --out catalog.json
+    python generate_catalog.py /path/to/vault --out catalog.json --check   # gate: 1 if stale
 """
 import argparse
 import json
@@ -81,6 +86,8 @@ def main():
     ap = argparse.ArgumentParser(description="Build a triage catalog for a Harness KB.")
     ap.add_argument("vault", help="path to the vault (folder of Markdown notes)")
     ap.add_argument("--out", default="catalog.json", help="output JSON path (default: catalog.json)")
+    ap.add_argument("--check", action="store_true",
+                    help="write nothing; exit 1 if the catalog on disk is stale (use as a gate)")
     args = ap.parse_args()
 
     vault = Path(args.vault).resolve()
@@ -125,11 +132,49 @@ def main():
         "tags": tags_seen,
         "notes": entries,
     }
+    if args.check:
+        # Detection stays separate from correction: --check never writes, it only reports.
+        # Ignore the volatile "generated_from" so the same vault checked out at a different
+        # path on another machine does not read as stale.
+        return report_staleness(catalog, Path(args.out))
+
     Path(args.out).write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"wrote {args.out}")
     print(f"notes: {len(entries)} (indexes: {n_index})")
     print(f"tags:  {', '.join(tags_seen) or '(none)'}")
     return 0
+
+
+def report_staleness(fresh, out_path):
+    """Compare a freshly built catalog with the one on disk. Returns an exit code."""
+    if not out_path.exists():
+        print(f"stale: {out_path} does not exist yet")
+        return 1
+    try:
+        old = json.loads(out_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"stale: cannot read {out_path}: {exc}")
+        return 1
+
+    old_notes = {n.get("path"): n for n in old.get("notes", [])}
+    new_notes = {n["path"]: n for n in fresh["notes"]}
+    added = sorted(new_notes.keys() - old_notes.keys())
+    removed = sorted(old_notes.keys() - new_notes.keys())
+    changed = sorted(p for p in new_notes.keys() & old_notes.keys()
+                     if new_notes[p] != old_notes[p])
+
+    if not (added or removed or changed):
+        print(f"catalog is current: {fresh['count']} notes, {fresh['indexes']} indexes")
+        return 0
+    print(f"stale: {len(added)} added, {len(removed)} removed, {len(changed)} changed")
+    for path in added[:10]:
+        print(f"  + {path}")
+    for path in removed[:10]:
+        print(f"  - {path}")
+    for path in changed[:10]:
+        print(f"  ~ {path}")
+    print("run without --check to regenerate")
+    return 1
 
 
 if __name__ == "__main__":

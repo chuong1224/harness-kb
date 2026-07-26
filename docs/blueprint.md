@@ -128,6 +128,45 @@ Two properties matter more than the implementation:
   numbers impossible to break silently - which is exactly the precondition H2 needs before anything
   is allowed to rewrite them (§7, rule 4).
 
+### The tooling has to live in the vault, not beside it
+
+One source of truth applies to the *tools* as much as to the data. The tempting place to put a
+generator or a checker is wherever your agent keeps its skills, or a config directory, or the folder
+you happened to clone it into. All of those live **outside** the vault - and that single decision
+quietly breaks three things at once:
+
+- **The KB stops being self-sufficient.** A machine that has the vault but not the tool cannot
+  regenerate the catalog or run the gate. Work done there silently degrades the KB: notes get added,
+  derived artifacts go stale, and nobody notices until someone sits at the *other* machine.
+- **The tool itself becomes a drift source.** Two machines, two copies, edited on different days.
+  Same vault, two answers - and no way to tell which one is right.
+- **It lands in the audit's blind spot.** The audit scans the vault. A checker outside the vault is,
+  by construction, unchecked. We found a path constant that had been broken for a week inside exactly
+  that gap: every session using it silently fell back to a slower, lossier retrieval route.
+
+> **Rule: anything the KB needs in order to verify or regenerate itself belongs inside the KB**,
+> versioned with the content it acts on, depending on nothing but a stock interpreter.
+
+What may stay outside is narrow and specific: **secrets**, **large binaries**, and **per-machine
+configuration** (paths, ports). A thin launcher or hook may live in machine config as long as it only
+*calls into* the in-vault script and holds no logic of its own.
+
+The scaling argument is the one that matters. With two machines you can patch by hand and remember
+which is behind. At team or company scale, per-machine copies grow linearly while the chance that
+they agree collapses: N machines is N chances for the gate to be missing, outdated, or subtly
+different — and every one of those is invisible to an audit that only reads the vault. In-vault
+tooling makes that class of failure structurally impossible instead of merely unlikely.
+
+The test is blunt: **clone the vault onto a clean machine. Can you run the gate?** If the answer
+requires installing something first, the tooling is in the wrong place.
+
+One migration caveat, learned the hard way. When you move a generator into the vault, its output must
+match the old one **field for field** — otherwise the two machines take turns rewriting the same
+derived file and every sync becomes a diff. Port it, then run it in a compare mode against the
+artifact the old tool produced and reconcile until only genuine content changes remain. Undocumented
+conventions surface fast that way: slug truncation limits, whether headings include the H1, what a
+missing frontmatter field defaults to.
+
 ---
 
 ## 6. Roadmap: closing the loops

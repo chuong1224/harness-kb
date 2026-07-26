@@ -1,0 +1,4 @@
+# Same bytes on every machine. Without this, a clone on Windows with core.autocrlf=true
+# checks these files out with CRLF and the next commit rewrites every line — which is the
+# per-machine drift this blueprint argues against (docs/blueprint.md §5), applied to itself.
+* text=auto eol=lf

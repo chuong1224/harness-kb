@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-25
+
+### Added
+- Blueprint §5: **"The tooling has to live in the vault, not beside it"** - why generators and
+  checkers kept in per-machine config break self-sufficiency, become a drift source of their own,
+  and land in the audit's blind spot; what may legitimately stay outside (secrets, large binaries,
+  per-machine paths); the scaling argument for teams; the clean-machine test; and the migration
+  caveat that a ported generator must match the previous output field for field.
+- `generate_catalog.py --check`: writes nothing and exits 1 when the catalog on disk no longer
+  matches the vault, so a stale catalog fails a scheduled job instead of silently degrading
+  retrieval. Detection stays separate from correction.
+- Daily audit routine gained a step that runs the catalog gate, and treats "the script is missing on
+  this machine" as the finding itself.
+- `.gitattributes` pinning `eol=lf`, so a clone on a machine with `core.autocrlf=true` cannot
+  silently rewrite every line — the same per-machine drift the blueprint argues against, applied
+  to this repository itself.
+
 ## [1.2.1] - 2026-07-25
 
 ### Changed

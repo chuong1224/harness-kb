@@ -28,15 +28,26 @@ the content-integrity loop in the Harness KB blueprint.
    Every `DRIFT` entry goes straight into the conflicts section of the report with its `file:line`.
    Warnings are worth reading but do not fail the run.
 
-3. Read the rule documents for anything the checker cannot see: a *new* enumerable fact stated
+3. Confirm the derived artifacts are not stale — a catalog that lags behind the notes sends every
+   agent down the slow path without anyone noticing:
+
+   ```bash
+   python scripts/generate_catalog.py "<VAULT_PATH>" --out "<CATALOG_PATH>" --check
+   ```
+
+   Exit `1` means the catalog no longer matches the vault; regenerate it (same command without
+   `--check`) and say so in the report. If this fails because the script is missing on the machine
+   running the audit, that is the real finding: move the tooling into the vault (blueprint §5).
+
+4. Read the rule documents for anything the checker cannot see: a *new* enumerable fact stated
    without a marker, a list that is technically complete but misleading, a rule whose wording now
    contradicts another document. Register genuinely new claims in the rules file instead of
    describing the drift again tomorrow.
 
-4. For rules that need judgment (translation quality, semantic tag fit, "cover summary" coverage),
+5. For rules that need judgment (translation quality, semantic tag fit, "cover summary" coverage),
    assess them yourself and note anything suspicious.
 
-5. Overwrite the report note (e.g. `Audit Report`) with a checklist:
+6. Overwrite the report note (e.g. `Audit Report`) with a checklist:
    - Contract violations (from the gate)
    - Soft suggestions
    - Rule conflicts / stale rules
