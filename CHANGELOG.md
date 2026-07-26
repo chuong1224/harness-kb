@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-26
+
+### Added
+- `examples/scripts/claim.py`: a **mechanical per-file lock** for knowledge bases that more than one
+  agent session writes to — the reference implementation of roadmap item **H4**. A `PreToolUse` hook
+  claims a file before the write and exits 2 (blocking the tool call) when another live stream holds
+  it, with a message naming the holder and the ways out. Free files are claimed silently, so a
+  single agent never notices the lock.
+- `examples/scripts/test_claim.py`: 25 break-the-lock cases proving it blocks when it should
+  (contention, hook path, role reversal after a takeover, close races) and stays out of the way when
+  it shouldn't (renewals, other files, read tools, its own state directory, files outside the vault,
+  malformed payloads, no session id, the kill switch).
+- Hook example gained the `PreToolUse` and `SessionEnd` entries, and `examples/hooks/README.md` now
+  documents both legs — logging (async, cannot deny) and the claim lock (synchronous, blocking) —
+  including a copy-pasteable way to watch the lock refuse a write before trusting it in a session.
+
+### Changed
+- Blueprint §6 H4 is no longer a sketch: it states the four decisions the implementation rests on
+  (one claim file per stream so a synced folder cannot produce conflict copies; the earliest claim
+  wins so conflicts resolve from data rather than write order; silence when working alone; fail
+  open), and the two limits worth saying out loud — cross-machine safety is bounded by file-sync
+  latency, and only the agent's file tools pass through the hook.
+
 ## [1.3.0] - 2026-07-25
 
 ### Added

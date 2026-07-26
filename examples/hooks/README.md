@@ -1,7 +1,16 @@
-# Activity-logging hook (the observability leg)
+# Hooks: the observability leg and the coordination leg
 
 `settings.json` is an example [Claude Code](https://docs.claude.com/en/docs/claude-code) hook
-configuration. It wires a `PostToolUse` hook so that **every time the agent reads, searches, or
+configuration wiring two things the harness should own rather than ask an agent to remember:
+
+| Hook | What it does |
+|---|---|
+| `PostToolUse` | Every read/search/edit appends an event to an activity log — **observability** |
+| `PreToolUse` + `SessionEnd` | Every write first claims the file, and blocks if another agent stream holds it — **coordination** (`claim.py`, blueprint H4) |
+
+## Activity logging (the observability leg)
+
+The `PostToolUse` entry means **every time the agent reads, searches, or
 edits a note, an event is appended to an activity log — automatically, without the agent having
 to remember to log.**
 
@@ -35,3 +44,39 @@ retrieval-efficiency report (long chains and re-reads are the signal for H3 in t
 **The agent only WRITES the log. It never runs the viewer/server.** Separating "emit events" from
 "serve the UI" is what keeps a single well-behaved reader and avoids zombie processes holding a
 port — a small but load-bearing guardrail.
+
+---
+
+## The claim lock (the coordination leg)
+
+The `PreToolUse` entry runs [`../scripts/claim.py`](../scripts/claim.py) **before every write tool
+call**, and the `SessionEnd` entry releases whatever the session still held. Unlike the logger this
+hook is **synchronous and blocking** — that is the whole point:
+
+- `async` is deliberately absent. An async hook cannot deny anything; the write would already be
+  on its way.
+- Exiting **2** blocks the tool call and hands the message on stderr back to the model, which then
+  sees who holds the file, since when, and what to do about it.
+- Exiting **0** allows it. `claim.py` exits 0 on anything it is unsure about — malformed payload,
+  no session id, path outside the vault — because a lock that can freeze a session is a lock
+  someone will switch off permanently.
+
+Try it in one terminal before trusting it in a session:
+
+```bash
+# pretend another agent is editing a shared file
+python examples/scripts/claim.py take ops/runbook.md --stream other --why "rewriting rollback"
+python examples/scripts/claim.py status
+
+# now the hook refuses your write (exit 2 + an explanation)
+echo '{"session_id":"me","tool_name":"Edit","tool_input":{"file_path":"ops/runbook.md"}}' \
+  | python examples/scripts/claim.py hook ; echo "exit=$?"
+
+python examples/scripts/claim.py release --all --stream other
+```
+
+**Where the state lives:** one small JSON file per stream under `<vault>/.claims/`, plus an
+append-only `_events-<host>.jsonl` recording the rare events (a block, a takeover). One writer per
+file is what makes this safe inside a synced folder — see blueprint §6 H4 for the reasoning, and
+`../scripts/test_claim.py` for the 25 cases that prove it blocks when it should and stays quiet
+when it shouldn't.

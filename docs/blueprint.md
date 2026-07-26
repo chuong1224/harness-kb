@@ -195,10 +195,33 @@ a dashboard. Close the loop by **generating suggestions** — "link notes A and 
 on the same topic", "note X is an orphan, add it to an index" — into an actionable worklist, instead
 of waiting for a human to read the dashboard and infer the fix.
 
-### H4 — Mechanical coordination instead of convention
+### H4 — Mechanical coordination instead of convention  *(reference implementation included)*
 If multiple agents/sessions share the KB, replace "please check the version before editing" with a
 **mechanical lock** (a lock file / per-file claim). This turns a social contract into a hard
 guardrail and ends the class of bugs where two parallel streams clobber each other.
+
+**Shipped here:** `examples/scripts/claim.py` (per-file claims + a `PreToolUse` hook that exits 2 to
+block the write) + `examples/scripts/test_claim.py` (break-the-lock tests) + the hook wiring in
+`examples/hooks/settings.json`. Four design decisions are the whole story:
+
+- **One claim file per stream, never a shared one.** Vaults live in synced folders; two machines
+  appending to a single lock file is how you manufacture conflict copies and lost updates — the
+  exact failure the lock exists to prevent. Writers never touch each other's files.
+- **Conflicts are resolved from data, not from write order.** Among live holders, the earliest
+  `since` wins; every process reading the same files reaches the same verdict. Claiming is
+  write-then-verify, so in a close race the loser withdraws instead of both sides believing they
+  hold the file.
+- **Silent when you work alone, loud only on a real collision.** A free file is claimed with no
+  output; the lock is invisible until it saves you. Claims lapse on their own (untouched file, or a
+  stream gone silent), so nothing has to be cleaned up by hand.
+- **It fails open.** Malformed payload, missing session id, no vault found → allow the write. A
+  lock that can freeze an agent session will be disabled by the first person it inconveniences, and
+  then you have no lock at all.
+
+Two limits worth stating out loud, because a lock people over-trust is worse than none: across
+machines the guarantee is only as fast as your file sync, and only the agent's *file tools* pass
+through the hook — shell commands, scripts and desktop editors do not (deliberately: a human
+editing their own notes should never be blocked).
 
 *(Optional, later — H5: feed the cost/performance logs into a threshold that warns or suggests a
 cheaper model when a scheduled run exceeds its token budget.)*

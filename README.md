@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -66,7 +66,9 @@ harness-kb/
 │   ├── scripts/check_rules_drift.py  Documents vs. the source of truth — kills rule drift (H1)
 │   ├── scripts/test_drift_check.py   Break-the-gate tests for the drift checker
 │   ├── scripts/generate_catalog.py  Triage catalog for agent retrieval — `--check` gates staleness
-│   ├── hooks/settings.json       Example activity-logging hook (Claude Code PostToolUse)
+│   ├── scripts/claim.py          Per-file lock so parallel agents can't clobber each other (H4)
+│   ├── scripts/test_claim.py     Break-the-lock tests for the claim lock
+│   ├── hooks/settings.json       Example hooks: activity logging + the blocking claim lock
 │   └── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
 └── LICENSE
 ```
@@ -90,11 +92,18 @@ python examples/scripts/generate_catalog.py /path/to/your/vault --out catalog.js
 
 # ...and gate it: exit 1 when the catalog no longer matches the notes
 python examples/scripts/generate_catalog.py /path/to/your/vault --out catalog.json --check
+
+# 4. See which agent stream currently holds which file (multi-agent lock, H4)
+python examples/scripts/claim.py status --vault /path/to/your/vault
 ```
 
 > **Put these scripts inside the vault they serve.** A machine with the notes but without the tools
 > cannot verify or regenerate anything, and a second copy kept in per-machine config drifts from the
 > first with no audit able to see it. That failure grows with every machine you add — blueprint §5.
+
+Wire `claim.py` into a `PreToolUse` hook ([examples/hooks](./examples/hooks)) and the lock stops
+being advice: a write to a file another stream is editing is **blocked**, not merely discouraged.
+It claims free files silently, so a single agent never notices it.
 
 Both checkers exit `0` when clean and `1` when they find problems — so you can wire them into a
 commit hook or a scheduled job as a hard gate. Point them at `examples/demo-vault` to see real
@@ -119,6 +128,10 @@ tự giữ mình **đúng — tươi — truy xuất nhanh**. Đây là *kiến 
 chưa phải harness. Harness thật là một **vòng điều khiển khép kín**: cảm biến độ lệch → quyết
 định → tự chỉnh → xác minh → giữ trên đường ray, với can thiệp người tối thiểu. Mục tiêu: đưa
 con người từ *người vận hành* thành *người giám sát* chỉ phê duyệt thay đổi rủi ro cao.
+
+**Khi nhiều agent dùng chung một vault:** đừng dựa vào luật "nhớ kiểm tra trước khi sửa" — đó là
+khế ước xã hội, chỉ đúng tới lần đầu tiên một model quên. `claim.py` biến nó thành **khoá cơ học**:
+hook chặn thẳng lệnh ghi khi stream khác đang giữ file, và im lặng khi bạn làm một mình.
 
 **Một luật kiến trúc đáng nhớ:** script kiểm tra / sinh dữ liệu phải nằm **trong chính vault**, không
 để trong thư mục cấu hình của từng máy. Máy có note mà thiếu công cụ thì không verify hay regen được
