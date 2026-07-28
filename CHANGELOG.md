@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-07-28
+
+### Added
+- `test_auto_fix.py` case 10: **every companion tool is invoked in a shape that tool accepts.**
+  The bug behind it, found in the private implementation this repo mirrors: a companion built on
+  argparse *subparsers* wants its global flags before the subcommand, and putting them after
+  returns exit 2. A caller that reads "non-zero" as "gate red" then refuses to do any work, every
+  run, while printing a sentence that sounds like caution. Nine existing cases missed it because
+  every one of them disabled that gate for speed - **a path the tests always switch off is a path
+  nobody has ever run.** The case treats exit 0 and 1 as fine and exit 2 (or "unrecognized
+  arguments") as the failure, so it catches the whole class rather than one flag order.
+
 ## [1.6.1] - 2026-07-28
 
 An independent review of 1.6.0, run the same day, found three defects in the fixer. All three

@@ -224,6 +224,32 @@ def main():
                "exit=%d, fixes=%d, refused=%s | %s"
                % (code, len(planned["fixes"]), refused, line))
 
+    # 10 - every neighbour is invoked in a shape that neighbour accepts ---------
+    # The bug this exists for: a companion tool built on argparse SUBPARSERS wants its
+    # global flags BEFORE the subcommand. Put them after and you get exit 2, which a
+    # caller reading "non-zero" as "gate red" turns into a permanent, quiet refusal to
+    # do any work - the failure mode that sounds like caution. Exit 0 or 1 are both fine
+    # here (green gate / red gate); exit 2 means we are calling it wrong.
+    with Sandbox() as box:
+        shapes = [
+            ("check_rules_drift.py", ["check_rules_drift.py", str(box.vault),
+                                      "--rules", str(box.rules), "--json"]),
+            ("verify_kb.py", ["verify_kb.py", str(box.vault), "--rules", str(box.rules)]),
+            ("claim.py", ["claim.py", "check", "Ops/Index - Ops.md", "--vault", str(box.vault),
+                          "--stream", "autofix-selftest"]),
+        ]
+        bad = []
+        for label, argv in shapes:
+            tool = HERE / argv[0]
+            if not tool.exists():
+                continue
+            p = subprocess.run([sys.executable, str(tool), *argv[1:]], capture_output=True,
+                               text=True, encoding="utf-8", errors="replace")
+            if p.returncode == 2 or "unrecognized arguments" in (p.stderr or ""):
+                bad.append("%s -> exit %d" % (label, p.returncode))
+        report("10 - neighbours are called in a shape they accept (no usage errors)",
+               not bad, "; ".join(bad) if bad else "%d invocation(s) accepted" % len(shapes))
+
     print()
     print("all cases passed" if not failures else "%d case(s) FAILED" % failures)
     return 1 if failures else 0
