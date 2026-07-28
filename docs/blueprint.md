@@ -213,10 +213,35 @@ restate which claims) + `examples/scripts/check_rules_drift.py` (the checker, ex
 `examples/scripts/test_drift_check.py` (break-the-gate tests). See §5 for the marker pattern.
 Wire the checker into the daily audit and the class of drift stops being something a human notices.
 
-### H2 — Promote the audit from "report" to "safe auto-fix"
+### H2 — Promote the audit from "report" to "safe auto-fix"  *(reference implementation included)*
 For **mechanical, reversible** errors (broken links, missing frontmatter fields, count mismatches,
 orphan images), let the audit **fix + back up + log + keep a rollback path.** Keep everything that
 requires *judgment* (translation, semantic tag classification, note structure) strictly read-only.
+
+**Shipped here:** `examples/scripts/auto_fix.py` (fixes marked count claims, backs up, re-gates,
+rolls back) + `examples/scripts/test_auto_fix.py` (break-the-fixer tests) +
+`examples/routines/kb-autofix-daily.SKILL.md` (the scheduled run that follows the audit). Four
+decisions are the whole design:
+
+- **Open exactly one class first.** A number on a line that carries a marker: the marker names the
+  claim, the rules file supplies the value, and one token changes. The fixer never has to understand
+  the sentence it edits — which is the property that makes it safe, and the property most
+  "auto-repair" features quietly lack.
+- **Two independent sources must agree.** The checker reports `X -> Y`; the fixer re-reads that line
+  and must find token `X` there itself, using the claim's own pattern. Line edited since, number
+  spelled out in words, marker gone → skip with a reason. There is no branch that guesses, because
+  a wrong "fix" written confidently into the constitution is worse than an unfixed report.
+- **The gate decides whether the fix counts.** Write, then re-run the drift check *and* the
+  integrity gate. Either red → restore every touched file from the backup taken seconds earlier and
+  exit non-zero. Rollback is not a manual escape hatch you hope works; it is on the normal path and
+  has a test that forces it.
+- **Refusals are part of the contract, not gaps.** Incomplete enumerations (what to insert, worded
+  how), removed markers (deliberate or lost?), and anything semantic stay in the report. Widening
+  the list is a decision to make in daylight — never a flag on the command line.
+
+One operational note: pair it with the per-file lock (H4) if more than one stream writes. A file
+another stream holds defers the entire run rather than racing it — an auto-fixer that fights a live
+editor is a corruption engine with good intentions.
 
 ### H3 — Turn retrieval signals into actions
 Metrics (frequently re-read notes, long retrieval chains, isolated hot notes) currently just sit on
@@ -283,8 +308,9 @@ The KB qualifies as a harness in the full sense when these are **measurable**:
 
 - [ ] **Zero drift:** enumerable facts no longer disagree between documents — the audit reports
       zero "count/enumeration" conflicts for 30 consecutive days (via H1).
-- [ ] **At least one class of mechanical error is auto-fixed** by the audit (no manual session),
-      with a log and a rollback proving it is safe (via H2).
+- [x] **At least one class of mechanical error is auto-fixed** by the audit (no manual session),
+      with a log and a rollback proving it is safe (via H2 — marked count claims; the rollback path
+      is exercised by a test that forces the post-fix gate red).
 - [ ] **Retrieval signals become an actionable worklist**, not just a dashboard (via H3).
 - [ ] **Multi-agent access uses a mechanical lock**, not discipline (via H4).
 - [ ] **Every operational loop has all five stages:** sensor + threshold + action + verification +

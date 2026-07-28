@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-28
+
+### Added
+- `examples/scripts/auto_fix.py`: the **correction stage** of the loop — roadmap item **H2**, and the
+  first script here that writes to your notes. It opens exactly one class: a number on a line
+  carrying a marker, where the marker names the claim and the rules file supplies the value, so the
+  fixer never has to understand the sentence it edits. Two independent sources must agree (the
+  checker's `X -> Y` and the fixer's own re-read of that line) or the fix is skipped with a reason;
+  every touched file is backed up first; both gates re-run afterwards and a red one restores the
+  whole run and exits non-zero. Incomplete enumerations, removed markers and anything semantic stay
+  in the report on purpose.
+- `examples/scripts/test_auto_fix.py`: 9 break-the-fixer cases — a dry run that writes nothing, a
+  fix that lands on exactly the original bytes, a second run that is a no-op, a number spelled out
+  in words that must be skipped rather than guessed, files outside the rules registry left
+  untouched, manual rollback, and the one that makes the rest believable: a forced red gate after
+  the fix, which must roll everything back and exit 1.
+- `examples/routines/kb-autofix-daily.SKILL.md`: template for the scheduled run that follows the
+  read-only audit — exit-code handling per case, a single-file write boundary, and the log
+  discipline (copy numbers verbatim, never claim a task is done unverified, log clean days too).
+
+### Changed
+- Blueprint H2 gained its reference-implementation section: why one class first, why two sources
+  must agree, why the gate decides whether a fix counts, and why the refusals are part of the
+  contract rather than gaps. Acceptance criterion "at least one class of mechanical error is
+  auto-fixed" is now ticked, with the rollback path exercised by a test rather than asserted.
+- README documents the fixer as the deliberately narrowest script in the repo, and pairs it with
+  the per-file lock: a file another stream holds defers the run instead of racing it.
+
 ## [1.5.0] - 2026-07-26
 
 ### Added

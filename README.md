@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -65,13 +65,16 @@ harness-kb/
 │   ├── scripts/verify_kb.py      Integrity gate — the "verify" step of the loop (zero deps)
 │   ├── scripts/check_rules_drift.py  Documents vs. the source of truth — kills rule drift (H1)
 │   ├── scripts/test_drift_check.py   Break-the-gate tests for the drift checker
+│   ├── scripts/auto_fix.py       Fixes the one safe class of drift — backup, gate, rollback (H2)
+│   ├── scripts/test_auto_fix.py  Break-the-fixer tests, including a forced rollback
 │   ├── scripts/generate_catalog.py  Triage catalog for agent retrieval — `--check` gates staleness
 │   ├── scripts/claim.py          Per-file lock so parallel agents can't clobber each other (H4)
 │   ├── scripts/test_claim.py     Break-the-lock tests for the claim lock
 │   ├── scripts/tooling_selfcheck.py  Runs your tooling's test suites — the gate that runs the gates
 │   ├── scripts/test_tooling_selfcheck.py  Break-the-gate tests for that runner
 │   ├── hooks/settings.json       Example hooks: activity log, claim lock, tooling gate
-│   └── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
+│   ├── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
+│   └── routines/kb-autofix-daily.SKILL.md  Template for the auto-fix run that follows it
 └── LICENSE
 ```
 
@@ -100,6 +103,10 @@ python examples/scripts/claim.py status --vault /path/to/your/vault
 
 # 5. Run the test suites that guard your own in-vault tooling
 python examples/scripts/tooling_selfcheck.py run --vault /path/to/your/vault
+
+# 6. Let the machine fix the one class of drift it cannot get wrong (dry run first)
+python examples/scripts/auto_fix.py /path/to/your/vault --rules examples/rules/rules.example.json
+python examples/scripts/auto_fix.py /path/to/your/vault --rules examples/rules/rules.example.json --apply
 ```
 
 > **Put these scripts inside the vault they serve.** A machine with the notes but without the tools
@@ -111,6 +118,13 @@ being advice: a write to a file another stream is editing is **blocked**, not me
 It claims free files silently, so a single agent never notices it. Wire `tooling_selfcheck.py` into
 the `Stop` hook and the same becomes true of your tests: edit a tool, and its suite runs before the
 turn is allowed to end — because a gate nobody runs is not a gate.
+
+`auto_fix.py` is the only script here that writes to your notes, and it is deliberately the
+narrowest one: it rewrites a **number on a line that carries a marker**, nothing else. It refuses
+the fix whenever the checker's report and its own re-read of that line disagree, backs up every
+file it touches, re-runs both gates afterwards, and rolls the whole run back if either goes red.
+Incomplete enumerations, removed markers and anything semantic stay in the report for a human —
+widening that list should be a decision, not a flag.
 
 Both checkers exit `0` when clean and `1` when they find problems — so you can wire them into a
 commit hook or a scheduled job as a hard gate. Point them at `examples/demo-vault` to see real
