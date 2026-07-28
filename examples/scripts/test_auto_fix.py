@@ -13,6 +13,8 @@ never damage anything.
   5. a red gate after the fix rolls everything back and exits 1
   6. --rollback restores the state from before a run
   7. files the rules file does not register are never touched
+  8. a CRLF file is still CRLF afterwards - a one-token fix must not rewrite every line
+  9. a line whose markers collide is refused outright, never half-fixed
 
 Usage: python test_auto_fix.py
 Exit:  0 = all pass, 1 = at least one failure
@@ -86,7 +88,8 @@ class Sandbox:
         return None, None
 
     def break_line(self, path, lineno, replacement):
-        text = path.read_text(encoding="utf-8")
+        with open(path, encoding="utf-8", newline="") as fh:   # keep CRLF as CRLF
+            text = fh.read()
         lines = text.splitlines(keepends=True)
         lines[lineno - 1] = replacement(lines[lineno - 1])
         path.write_text("".join(lines), encoding="utf-8", newline="")
@@ -173,6 +176,53 @@ def main():
                code == 0 and code2 == 0 and fixed == original
                and target.read_text(encoding="utf-8") == broken,
                "apply=%d rollback=%d" % (code, code2))
+
+    # 8 - CRLF files stay CRLF (the bug this suite exists to keep out) ---------
+    with Sandbox() as box:
+        target, lineno = box.target()
+        crlf = target.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        target.write_bytes(crlf)
+        original, broken = box.break_line(target, lineno, off_by_one)
+        before = target.read_bytes().count(b"\r\n")
+        code, _ = box.run("--apply")
+        after = target.read_bytes()
+        lone_lf = after.count(b"\n") - after.count(b"\r\n")
+        report("8 - a CRLF file is still CRLF after the fix",
+               code == 0 and after.count(b"\r\n") == before and lone_lf == 0
+               and after == crlf,
+               "exit=%d, CRLF %d -> %d, bare LF %d"
+               % (code, before, after.count(b"\r\n"), lone_lf))
+
+    # 9 - two markers on ONE line that share a pattern -------------------------
+    # The dangerous shape is two claims with DIFFERENT sources but the same number
+    # pattern. Fixing the left one writes a value equal to what the right one currently
+    # reads, so a fixer that re-searches the line lands on the token it just wrote:
+    # the correct number gets overwritten and the wrong one survives.
+    with Sandbox() as box:
+        rules = json.loads(box.rules.read_text(encoding="utf-8"))
+        rules["documents"]["claim_types"]["tag_count_alias"] = {
+            "description": "same unit as tag_count, different source - the collision case",
+            "source": "area_count", "patterns": [r"(\d+)\s*tags?\b"]}
+        box.rules.write_text(json.dumps(rules, ensure_ascii=False, indent=2), encoding="utf-8")
+        facts = json.loads(subprocess.run(
+            [sys.executable, str(HERE / "check_rules_drift.py"), str(box.vault),
+             "--rules", str(box.rules), "--show"],
+            capture_output=True, text=True, encoding="utf-8").stdout)
+        tags, areas = facts["tag_count"], facts["area_count"]
+        doc = box.vault / rules["documents"]["consumers"][0]["path"]
+        with open(doc, "a", encoding="utf-8", newline="") as fh:
+            fh.write("\nSummary: %d tags <!-- rules:tag_count --> of %d tags "
+                     "<!-- rules:tag_count_alias -->\n" % (tags - 3, tags))
+        planned = json.loads(box.run("--json")[1])
+        code, out = box.run("--apply")
+        line = next((l for l in doc.read_text(encoding="utf-8").splitlines()
+                     if l.startswith("Summary:")), "line gone")
+        untouched = line.startswith("Summary: %d tags" % (tags - 3))
+        refused = any("same number" in s["why"] for s in planned["skipped"])
+        report("9 - ambiguous line (two markers, one number) is refused, not guessed",
+               code == 0 and not planned["fixes"] and refused and untouched,
+               "exit=%d, fixes=%d, refused=%s | %s"
+               % (code, len(planned["fixes"]), refused, line))
 
     print()
     print("all cases passed" if not failures else "%d case(s) FAILED" % failures)

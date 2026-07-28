@@ -239,9 +239,18 @@ decisions are the whole design:
   how), removed markers (deliberate or lost?), and anything semantic stay in the report. Widening
   the list is a decision to make in daylight — never a flag on the command line.
 
-One operational note: pair it with the per-file lock (H4) if more than one stream writes. A file
-another stream holds defers the entire run rather than racing it — an auto-fixer that fights a live
-editor is a corruption engine with good intentions.
+Two operational notes, both learned the hard way in the first day of review:
+
+- **Pair it with the per-file lock (H4)** if more than one stream writes — and *hold* the lock, do
+  not merely ask. A checked-then-written file is a race with a polite name; shell writes never pass
+  through the tool hook, so nothing else is holding it for you. A file another stream holds should
+  defer the entire run rather than race it: an auto-fixer that fights a live editor is a corruption
+  engine with good intentions.
+- **Keep one marker per unit per line.** The checker matches patterns across the whole line, so two
+  markers of the same unit both receive the leftmost number and the *report itself* is wrong before
+  any fix is attempted. The fixer refuses such lines, but the durable answer is to attribute numbers
+  by marker position in the checker — a sensor whose ambiguity a downstream tool has to work around
+  is a sensor with a bug.
 
 ### H3 — Turn retrieval signals into actions
 Metrics (frequently re-read notes, long retrieval chains, isolated hot notes) currently just sit on

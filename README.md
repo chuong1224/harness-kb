@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -125,6 +125,11 @@ the fix whenever the checker's report and its own re-read of that line disagree,
 file it touches, re-runs both gates afterwards, and rolls the whole run back if either goes red.
 Incomplete enumerations, removed markers and anything semantic stay in the report for a human —
 widening that list should be a decision, not a flag.
+
+One rule the marker pattern depends on: **at most one marker per unit per line.** The drift checker
+matches its patterns across the whole line, so two markers of the same unit both get handed the
+leftmost number — the report is wrong before the fixer ever sees it. The fixer detects that overlap
+and refuses the line instead of guessing, but the real fix is to keep each claim on its own line.
 
 Both checkers exit `0` when clean and `1` when they find problems — so you can wire them into a
 commit hook or a scheduled job as a hard gate. Point them at `examples/demo-vault` to see real

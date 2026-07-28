@@ -4,6 +4,38 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-07-28
+
+An independent review of 1.6.0, run the same day, found three defects in the fixer. All three
+share a shape worth naming: each one only shows up on input the happy path never produces, which
+is exactly what a break-the-contract suite is for. Each fix ships with the case that would have
+caught it.
+
+### Fixed
+- **CRLF files were silently rewritten to LF.** The fixer read notes with Python's default text
+  mode, which normalises line endings on the way in; writing back turned a one-token fix into a
+  whole-file rewrite. On a synced vault every other machine sees "the entire document changed".
+  Reads are now raw (`newline=""`). New case 8 asserts a CRLF file is still CRLF, comparing bytes —
+  a test that compares decoded strings cannot see this bug at all.
+- **The lock was consulted, not held.** The fixer asked `claim.py` whether a file was free and then
+  wrote — an answer that is stale the moment it is given, since shell writes never pass through the
+  hook. It now `take`s every target, releases in a `finally`, and if any file cannot be taken it
+  releases what it holds and defers the whole run. It also uses its own stream id instead of
+  borrowing the caller's, because ending a run with `release --all` on a session's stream would
+  drop claims that session holds for unrelated work.
+- **Two claims pointing at the same number corrupted the line.** When one line carries two markers
+  of the same unit, the checker hands both claims the leftmost number, so the fixer planned two
+  different values for one token; re-locating after each write then landed on the number it had
+  just written. Fixes are now applied by recorded column, right to left, with the token verified at
+  that offset — and a line where two fixes overlap is **refused entirely** with a reason, rather
+  than half-applied and rolled back (which would also discard good fixes in other files). New case
+  9 covers it.
+
+### Changed
+- README and blueprint state the sensor-level limit plainly: one marker per unit per line. The
+  ambiguity starts in the drift checker's report, not in the fixer, and the honest fix there is to
+  attribute numbers by marker position — noted as follow-up work rather than papered over.
+
 ## [1.6.0] - 2026-07-28
 
 ### Added

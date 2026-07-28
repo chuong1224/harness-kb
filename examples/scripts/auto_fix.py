@@ -93,6 +93,19 @@ def run(cmd, cwd):
                           encoding="utf-8", errors="replace", cwd=str(cwd))
 
 
+def read_lines(path):
+    """Read RAW so the file's own line endings survive the edit.
+
+    Python's default text read turns CRLF into '\\n' on the way in; write it back and a
+    one-token fix silently rewrites every line of the file. On a synced vault that also
+    looks like "the whole document changed" to every other machine. Notes written on
+    Windows are CRLF often enough that this is a certainty, not a corner case.
+    """
+    with open(path, encoding="utf-8", newline="") as fh:
+        text = fh.read()
+    return text.splitlines(keepends=True)
+
+
 def drift_check(vault, rules, as_json=True):
     tool = HERE / "check_rules_drift.py"
     if not tool.exists():
@@ -141,17 +154,31 @@ def locate(line, patterns, got):
     return None
 
 
-def claim_blocked(vault, rels, stream):
-    """Defer when another live stream holds a target file (H4). Never steal."""
+def claims_acquire(vault, rels, stream):
+    """HOLD the lock on every target before writing (H4), not merely ask about it.
+
+    Checking and then writing leaves a window: the answer is already stale by the time the
+    write lands. Shell writes do not pass through the hook, so nothing else is holding the
+    file on this script's behalf. If any file cannot be taken, release the ones already
+    taken and defer the whole run - a half-applied batch is worse than a deferred one.
+    """
     tool = HERE / "claim.py"
     if not tool.exists():
-        return []
-    blocked = []
+        return [], False
+    taken, blocked = [], []
     for rel in rels:
-        p = run([sys.executable, tool, "check", rel, "--vault", vault, "--stream", stream], vault)
-        if p.returncode != 0:
-            blocked.append(rel)
-    return blocked
+        p = run([sys.executable, tool, "take", rel, "--vault", vault, "--stream", stream,
+                 "--why", "auto-fix of marked count claims"], vault)
+        (taken if p.returncode == 0 else blocked).append(rel)
+    if blocked and taken:
+        claims_release(vault, stream)
+    return blocked, bool(taken)
+
+
+def claims_release(vault, stream):
+    tool = HERE / "claim.py"
+    if tool.exists():
+        run([sys.executable, tool, "release", "--all", "--vault", vault, "--stream", stream], vault)
 
 
 def plan(vault, rules_path, rules, report):
@@ -169,7 +196,7 @@ def plan(vault, rules_path, rules, report):
         if not path.exists():
             skipped.append({"why": "file is gone", "detail": err})
             continue
-        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        lines = read_lines(path)
         if lineno > len(lines):
             skipped.append({"why": "line number past end of file", "detail": err})
             continue
@@ -182,10 +209,41 @@ def plan(vault, rules_path, rules, report):
             skipped.append({"why": "could not locate the number on that line", "detail": err})
             continue
         fixes.append({"file": rel, "line": lineno, "claim": claim, "got": got, "want": want,
-                      "col": span[0],
+                      "col": span[0], "end": span[1],
                       "before": line.rstrip("\r\n")[:120],
                       "after": (line[:span[0]] + str(want) + line[span[1]:]).rstrip("\r\n")[:120]})
-    return fixes, skipped
+    return drop_ambiguous(fixes, skipped)
+
+
+def drop_ambiguous(fixes, skipped):
+    """Two fixes aiming at the SAME number token: skip both rather than pick one.
+
+    This happens when a line carries two markers of the same unit (say a total and a
+    subset, both written as "N tags"). The checker scans patterns across the whole line,
+    so it hands BOTH claims the leftmost number - its report is already wrong for the
+    second claim - and the two fixes land on one column with two different values.
+    Nothing in the data says which marker owns which number, so the honest move is to
+    leave the line alone and let a human split it. Fixing one and rolling the batch back
+    would also throw away the legitimate fixes made in other files.
+    """
+    by_slot = {}
+    for f in fixes:
+        by_slot.setdefault((f["file"], f["line"]), []).append(f)
+    kept = []
+    for (rel, lineno), items in by_slot.items():
+        clash = [f for f in items if any(
+            g is not f and f["col"] < g["end"] and g["col"] < f["end"] for g in items)]
+        if clash:
+            claims = ", ".join(sorted("%s->%s" % (f["claim"], f["want"]) for f in clash))
+            skipped.append({
+                "why": "several claims point at the same number on this line",
+                "detail": "%s:%d: %s - the line carries more than one marker of the same "
+                          "unit; the checker cannot tell which number belongs to which "
+                          "marker. Split them onto separate lines." % (rel, lineno, claims)})
+            kept += [f for f in items if f not in clash]
+        else:
+            kept += items
+    return kept, skipped
 
 
 def do_backup(vault, rels, root):
@@ -247,28 +305,50 @@ def cmd_apply(args, vault, rules_path, rules, root):
         return 0
 
     rels = sorted({f["file"] for f in fixes})
-    stream = os.environ.get("KB_CLAIM_STREAM") or ("autofix-%d" % os.getpid())
-    blocked = claim_blocked(vault, rels, stream)
+    # A dedicated stream id on purpose: this run ends with "release --all", and borrowing
+    # the calling session's stream would drop claims that session holds for other work.
+    stream = os.environ.get("KB_AUTOFIX_STREAM") or ("autofix-%d" % os.getpid())
+    blocked, holding = claims_acquire(vault, rels, stream)
     if blocked:
         emit(args.json, {"ok": False, "deferred": blocked},
              "deferred - another stream holds: " + ", ".join(blocked))
         return 3
+    try:
+        return _apply_locked(args, vault, rules_path, rules, root, fixes, skipped)
+    finally:
+        if holding:
+            claims_release(vault, stream)
 
+
+def _apply_locked(args, vault, rules_path, rules, root, fixes, skipped):
+    """The writing half - runs while every target file is held; the caller releases."""
+    rels = sorted({f["file"] for f in fixes})
     manifest = do_backup(vault, rels, root)
     applied, errors = [], []
-    patterns_of = {k: v.get("patterns", []) for k, v in
-                   rules.get("documents", {}).get("claim_types", {}).items()}
-    for f in sorted(fixes, key=lambda x: (x["file"], -x["line"])):
-        path = vault / f["file"]
-        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        line = lines[f["line"] - 1]
-        span = locate(line, patterns_of.get(f["claim"], []), f["got"])
-        if span is None:                      # file changed between plan and apply
-            errors.append("%s:%d: line changed while planning" % (f["file"], f["line"]))
-            continue
-        lines[f["line"] - 1] = line[:span[0]] + str(f["want"]) + line[span[1]:]
-        path.write_text("".join(lines), encoding="utf-8", newline="")
-        applied.append(f)
+    # Write per FILE, and within a line replace RIGHT to LEFT using the columns recorded
+    # at planning time. Re-locating after each write is what bites you when one line
+    # carries two markers whose values collide: claim A becomes 15, and the search for
+    # claim B's current value of 15 then lands on the number just written. Fixed columns
+    # plus a token check at that exact offset removes the whole class - and a line edited
+    # by someone else in the meantime fails the check instead of being mangled.
+    by_file = {}
+    for f in fixes:
+        by_file.setdefault(f["file"], []).append(f)
+    for rel, items in by_file.items():
+        path = vault / rel
+        lines = read_lines(path)
+        done_here = []
+        for f in sorted(items, key=lambda x: (-x["line"], -x["col"])):
+            line = lines[f["line"] - 1]
+            col, token = f["col"], str(f["got"])
+            if line[col:col + len(token)] != token:
+                errors.append("%s:%d: line changed between planning and writing" % (rel, f["line"]))
+                continue
+            lines[f["line"] - 1] = line[:col] + str(f["want"]) + line[col + len(token):]
+            done_here.append(f)
+        if done_here:
+            path.write_text("".join(lines), encoding="utf-8", newline="")
+            applied.extend(done_here)
 
     verify = verify_after(vault, rules_path, errors)
     for ent in manifest["files"]:
