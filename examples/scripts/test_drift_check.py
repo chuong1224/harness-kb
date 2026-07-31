@@ -63,6 +63,24 @@ def case(name, mutate, expected):
         report(name, code == 1 and expected in out, out)
 
 
+def clean_case(name, mutate):
+    """The mirror of `case`: mutate() must leave the vault clean, so the checker exits 0.
+
+    Worth its own helper because "the checker stayed quiet" is only meaningful next to a
+    case proving it would have spoken - see the pair below about `attachments/`.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        vault, rules = sandbox(Path(tmp))
+        mutate(vault, rules)
+        code, out = run(vault, rules)
+        report(name, code == 0, out)
+
+
+def write_note(path: Path, text: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
 def replace_in(path: Path, old: str, new: str):
     text = path.read_text(encoding="utf-8")
     assert old in text, f"anchor text not found in {path.name}: {old!r}"
@@ -99,6 +117,24 @@ def main() -> int:
         "a registered document goes missing",
         lambda v, r: (v / RULES_DOC).unlink(),
         "registered as a consumer but the file is missing",
+    )
+    # A pair, not a single case. The first shows a scratch file under attachments/ is
+    # ignored; the second drops the same file one directory up and demands the checker
+    # notice. Without the second, "quiet" could just mean the check never ran.
+    clean_case(
+        "a scratch .md under attachments/ is not counted as a note",
+        lambda v, r: write_note(
+            v / "Ops" / "Backup Strategy" / "attachments" / "Index - Scratch.md",
+            "# Scratch\n\nWorking notes, not a note in the vault.\n",
+        ),
+    )
+    case(
+        "the same file one level up IS counted (proves the case above is not vacuous)",
+        lambda v, r: write_note(
+            v / "Ops" / "Backup Strategy" / "Index - Scratch.md",
+            "# Scratch\n\nWorking notes, not a note in the vault.\n",
+        ),
+        "DRIFT 'index_count'",
     )
 
     print(f"\n{'all cases passed' if failures == 0 else str(failures) + ' case(s) failed'}")

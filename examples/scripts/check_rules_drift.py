@@ -56,7 +56,11 @@ def strip_markup(line, marker_re):
 
 def is_excluded(path, vault, scan):
     prefixes = tuple(scan.get("exclude_dir_prefixes", [".", "_"]))
-    names = set(scan.get("exclude_dirs", [".git"]))
+    # `attachments/` holds a note's supporting files, so a stray .md in there is a
+    # scratch file, not a note. It is in the default because generate_catalog.py
+    # already excludes it unconditionally: leave it out here and the two tools that
+    # are meant to agree report different note counts off the same vault.
+    names = set(scan.get("exclude_dirs", [".git", ".obsidian", "node_modules", "attachments"]))
     for part in path.relative_to(vault).parts[:-1]:
         if part in names or part.startswith(prefixes):
             return True

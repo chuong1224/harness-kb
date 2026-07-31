@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] - 2026-07-31
+
+### Fixed
+- **Two tools that are supposed to agree counted the same vault differently.**
+  `generate_catalog.py` has always excluded `attachments/` — a note's supporting files are not
+  themselves notes — but `check_rules_drift.py` only excluded what the rules file named, and the
+  example rules did not name it. Point both at one vault and they disagreed on the note count by
+  exactly the number of stray `.md` files sitting in `attachments/`. In the private vault this
+  mirrors, that was one scratch file whose own first line said it was not a note, and it took a
+  routine run reporting two different totals to notice.
+
+  The disagreement is worse than either answer being wrong. A count that two tools derive
+  independently is the kind of fact people stop checking, so the drift checker was quietly
+  measuring a different vault than the catalog while both printed something confident.
+
+  `attachments` is now in the checker's built-in default (so a rules file that omits `scan` is
+  safe) *and* in `rules.example.json` (so a rules file copied from the example is safe). An
+  explicit `scan.exclude_dirs` still wins — configuration you wrote is not overridden.
+
+### Added
+- `test_drift_check.py`: a **pair** of cases for the above. One drops a scratch `.md` under
+  `attachments/` and demands silence; the other drops the same file one directory up and demands
+  the checker object. The second exists because the first alone cannot tell "correctly ignored"
+  apart from "never looked" — a passing test that would pass just as happily against a checker
+  that does nothing is not evidence.
+
 ## [1.6.2] - 2026-07-28
 
 ### Added

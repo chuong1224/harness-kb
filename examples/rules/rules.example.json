@@ -31,7 +31,7 @@
     "image_extensions": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"]
   },
   "scan": {
-    "exclude_dirs": [".git", ".obsidian", "node_modules"],
+    "exclude_dirs": [".git", ".obsidian", "node_modules", "attachments"],
     "exclude_dir_prefixes": [".", "_"]
   },
   "documents": {
