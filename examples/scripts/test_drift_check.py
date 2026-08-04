@@ -88,7 +88,18 @@ def replace_in(path: Path, old: str, new: str):
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
+def show_facts():
+    """The demo vault's own counts, read from the checker - never hard-coded here."""
+    with tempfile.TemporaryDirectory() as tmp:
+        vault, rules = sandbox(Path(tmp))
+        proc = subprocess.run(
+            [sys.executable, str(CHECKER), str(vault), "--rules", str(rules), "--show"],
+            capture_output=True, text=True, encoding="utf-8")
+        return json.loads(proc.stdout)
+
+
 def main() -> int:
+    facts = show_facts()
     with tempfile.TemporaryDirectory() as tmp:
         vault, rules = sandbox(Path(tmp))
         code, out = run(vault, rules)
@@ -150,22 +161,22 @@ def main() -> int:
             "description": "same unit as tag_count, different source - the collision case",
             "source": "area_count", "patterns": [r"(\d+)\s*tags?\b"]}
         rules.write_text(json.dumps(text, ensure_ascii=False, indent=2), encoding="utf-8")
-        facts = json.loads(subprocess.run(
-            [sys.executable, str(CHECKER), str(vault), "--rules", str(rules), "--show"],
-            capture_output=True, text=True, encoding="utf-8").stdout)
         with open(vault / RULES_DOC, "a", encoding="utf-8", newline="") as fh:
             fh.write("\nSummary: %d tags <!-- rules:tag_count --> of which %d tags "
-                     "<!-- rules:subset_count -->\n"
-                     % (facts["tag_count"], second(facts["area_count"])))
+                     "<!-- rules:subset_count -->\n" % (facts["tag_count"], second))
 
     clean_case(
         "two markers of one unit, both numbers right: no false alarm",
-        lambda v, r: two_markers(v, r, lambda areas: areas),
+        lambda v, r: two_markers(v, r, facts["area_count"]),
     )
+    # Naming the claim is not enough here: a whole-line scan ALSO reports drift on this
+    # line, just against the wrong number. The expectation therefore pins the number
+    # itself - without it the case passes before and after the fix and proves nothing.
     case(
-        "two markers of one unit: drift is reported against the number that marker owns",
-        lambda v, r: two_markers(v, r, lambda areas: areas - 1),
-        "DRIFT 'subset_count'",
+        "two markers of one unit: drift names the number that marker owns",
+        lambda v, r: two_markers(v, r, facts["area_count"] - 1),
+        "DRIFT 'subset_count' - document says %d, source of truth says %d"
+        % (facts["area_count"] - 1, facts["area_count"]),
     )
 
     print(f"\n{'all cases passed' if failures == 0 else str(failures) + ' case(s) failed'}")

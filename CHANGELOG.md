@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-08-04
+
+### Fixed
+- **One of the tests shipped in 1.8.0 could not tell the two behaviours apart.** The case asserting
+  that drift is attributed to the right marker only looked for `DRIFT 'subset_count'` in the output —
+  and the *previous* whole-line scan reports that same claim too, just against a number the marker
+  does not own. It passed before and after the change, which makes it decoration.
+
+  Caught by running every new case against the old behaviour, which is the check that 1.8.0's own
+  notes claimed for it. The expectation now pins the number: `document says 4, source of truth says
+  5`. Both cases in the pair now fail on the old checker and pass on the new one.
+
+  The demo vault's counts are read from `--show` rather than written into the test, for the same
+  reason the tool exists: a number copied out of its source drifts away from it.
+
 ## [1.8.0] - 2026-08-04
 
 ### Fixed
