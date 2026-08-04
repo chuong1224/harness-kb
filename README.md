@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.6.3-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -72,6 +72,8 @@ harness-kb/
 │   ├── scripts/test_claim.py     Break-the-lock tests for the claim lock
 │   ├── scripts/tooling_selfcheck.py  Runs your tooling's test suites — the gate that runs the gates
 │   ├── scripts/test_tooling_selfcheck.py  Break-the-gate tests for that runner
+│   ├── scripts/routine_guard.py  Orders scheduled routines by mechanism, not by cron spacing (H4b)
+│   ├── scripts/test_routine_guard.py  Break-the-wait tests for that guard
 │   ├── hooks/settings.json       Example hooks: activity log, claim lock, tooling gate
 │   ├── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
 │   └── routines/kb-autofix-daily.SKILL.md  Template for the auto-fix run that follows it
@@ -107,6 +109,9 @@ python examples/scripts/tooling_selfcheck.py run --vault /path/to/your/vault
 # 6. Let the machine fix the one class of drift it cannot get wrong (dry run first)
 python examples/scripts/auto_fix.py /path/to/your/vault --rules examples/rules/rules.example.json
 python examples/scripts/auto_fix.py /path/to/your/vault --rules examples/rules/rules.example.json --apply
+
+# 7. Before a routine that consumes the audit: block until today's report exists (H4b)
+python examples/scripts/routine_guard.py wait-report --report "/path/to/Audit Report.md"
 ```
 
 > **Put these scripts inside the vault they serve.** A machine with the notes but without the tools

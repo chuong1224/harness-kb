@@ -286,6 +286,62 @@ machines the guarantee is only as fast as your file sync, and only the agent's *
 through the hook — shell commands, scripts and desktop editors do not (deliberately: a human
 editing their own notes should never be blocked).
 
+### H4b — The order between scheduled routines is coordination too  *(reference implementation included)*
+H4 keeps two writers off the same file. There is a second, quieter half of the same problem: your
+daily routines have a **dependency order**, and in most setups the only thing enforcing it is the
+gap between their cron times.
+
+The audit writes a report; the fixer consumes that report; the catalog regeneration rewrites files
+the audit measures; the performance log reads the *session transcripts* of all of them. "08:00 <
+08:20 < 08:30 < 08:45" is not a guardrail — it is an assumption about the environment, and the
+environment only has to slip once.
+
+**How ours slipped.** The agent app sat closed past every cron slot and was reopened mid-morning.
+The scheduler fired **all five overdue routines within two minutes**, in an order unrelated to
+their cron times. Three failures landed at once, and every routine reported success:
+
+- the fixer read the audit report **four minutes before the audit wrote it**, froze a four-day-old
+  snapshot into the handling log, and filed a work item on a false premise;
+- the performance log started one second after the audit and scanned a transcript still being
+  appended to, recording *"audit: 9s / 149K tokens"* for a run that actually took 6m08s / 6.1M —
+  and that truncated number then travelled as evidence into the work item above;
+- the catalog regeneration rewrote the file the audit was measuring at that moment.
+
+Worth stating plainly, because it generalises past scheduling: **a truncated measurement is more
+dangerous than a missing one.** A missing row announces itself. A row with a session id, a token
+count and a timestamp looks exactly like a fact, and gets used like one.
+
+Two more things this exposed. First, the collision was never only about the outage: schedulers add
+jitter, and ours pushed the fixer (cron 08:20) to ~08:30 and the logger (cron 08:30) to ~08:31 —
+one minute apart, for a routine that runs three to four. The logger had been recording a truncated
+row for the fixer *every morning*, self-healing a day later only because the ledger overwrites by
+session id. Second, the fix is not "spread the cron times further apart": any gap collapses the
+same way.
+
+**Shipped here:** `examples/scripts/routine_guard.py` + `examples/scripts/test_routine_guard.py`,
+plus the wiring in the routine templates. Design decisions:
+
+- **Wait on data, not on a lock.** `wait-report` blocks until the audit report carries today's
+  date — the very fact the downstream routine has to establish anyway. A lock would need the
+  upstream routine to cooperate with begin/end, and a routine that dies mid-run (they do) leaves an
+  orphan lock; then you need lock expiry to repair your lock. Data does not lie.
+- **Only downstream waits.** No routine upstream ever waits on something downstream, so there is
+  no wait cycle and deadlock is impossible by construction. The audit template says this out loud,
+  because "let's make the audit wait for the catalog too" is the one edit that would create it.
+- **Liveness for the reader.** The log routine has no data signal to wait on, so `wait-quiet`
+  watches transcript mtimes and returns once no other scheduled run has written for `--idle`
+  seconds. Interactive human sessions are excluded by marker — a logger that mistakes your own chat
+  for a routine waits until timeout, every time.
+- **Fail-open and fail-closed in opposite directions.** Cannot read the sessions directory →
+  proceed (blocking the logger forever is worse than one row that heals next run). Cannot read the
+  report → **stand down** (proceeding without knowing whether the upstream stage ran is precisely
+  how the wrong conclusion got written).
+- **Defence in depth at the reader.** The guard is discipline at the prompt layer; the transcript
+  reader independently skips sessions written to within the last 90s. The two thresholds have an
+  invariant — idle (180s) must exceed in-flight (90s), or the guard says "all quiet, go" while the
+  reader still skips that session and the row silently vanishes for a day. A test holds that line,
+  not a comment.
+
 *(Optional, later — H5: feed the cost/performance logs into a threshold that warns or suggests a
 cheaper model when a scheduled run exceeds its token budget.)*
 

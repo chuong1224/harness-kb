@@ -24,6 +24,26 @@ fixes — it is that what it fixes can be proven safe.
 
 ## What to do
 
+0. **Wait for today's audit before anything else.** The cron gap does not guarantee order: when the
+   agent app is reopened after missing its scheduled slots, the scheduler fires every overdue
+   routine within a couple of minutes, in an arbitrary order. Ours did exactly that — this routine
+   started while the audit was still running, read a report from four days earlier, and filed a
+   work item on a false premise. See blueprint §6 H4b.
+
+   ```bash
+   python scripts/routine_guard.py wait-report --report "<AUDIT_REPORT_PATH>" --timeout 540
+   ```
+
+   - `0` → the report carries today's date; continue with step 1.
+   - `3` → retry the same command **once**. Still `3` → **stand down**: do not run the fixer, do not
+     write a log entry, do not file work items. Final message:
+     `Deferred - no audit report for today after ~18 minutes of waiting.`
+   - `2` → report unreadable, or dated after today (clock skew) → stand down the same way and quote
+     stderr verbatim.
+
+   Standing down is the correct outcome, not a failure. A wrong log entry costs more than a missing
+   one — resist the urge to "be helpful" and proceed on yesterday's report.
+
 1. Run the fixer and capture its JSON:
 
    ```bash
@@ -43,8 +63,10 @@ fixes — it is that what it fixes can be proven safe.
    - `3` → deferred, another stream holds a target file. Log it and stop; never steal the lock.
    - `2` → environment error (missing script, bad path). Log the command and stderr verbatim.
 
-2. Read today's audit report. If its timestamp is not from today, say so plainly in the log instead
-   of presenting a stale report as current.
+2. Read today's audit report and check its date **again** — step 0 established it, this is the
+   second gate in case the report was rewritten in between. If it is not today's, **stand down** as
+   in step 0: no entry, no work items. Do not write an entry carrying a stale snapshot "with a
+   caveat" — that caveat is exactly what produced a confident wrong diagnosis in our incident.
 
 3. Append **one entry** to the handling log (create it if today has none; never write a second entry
    for the same day):

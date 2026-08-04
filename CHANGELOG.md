@@ -4,6 +4,54 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-08-04
+
+### Added
+- **`routine_guard.py` — the order between scheduled routines, as a mechanism (H4b).** H4 keeps two
+  writers off one file; this is the other half of the same problem. Daily routines have a real
+  dependency order (the audit writes a report, the fixer consumes it, the log routine reads the
+  session transcripts of both), and the only thing enforcing it was the gap between cron times.
+  That is an assumption about the environment, not a guardrail.
+
+  Ours slipped: the agent app sat closed past every scheduled slot and was reopened mid-morning, so
+  the scheduler fired **all five overdue routines within two minutes**, in an order unrelated to
+  their cron times. The fixer read the audit report four minutes *before* the audit wrote it, froze
+  a four-day-old snapshot into the handling log and filed a work item on a false premise; the
+  performance log started one second after the audit, scanned a transcript still being written, and
+  recorded "9s / 149K tokens" for a run that actually took 6m08s / 6.1M — a number that then
+  travelled as evidence. Every routine reported success.
+
+  `wait-report` blocks until the audit report carries today's date; `wait-quiet` blocks until no
+  other scheduled run has written to its transcript for `--idle` seconds; `status` prints both.
+  Waiting on **data** rather than on a lock is deliberate: a lock needs the upstream routine to
+  cooperate with begin/end, and a routine that dies mid-run leaves an orphan lock you then need
+  another mechanism to expire. It also means only downstream ever waits — the chain is acyclic, so
+  deadlock is impossible by construction.
+
+  Fail-open and fail-closed point in opposite directions on purpose. Unreadable sessions directory
+  → proceed (jailing the logger is worse than one row that heals on the next run). Unreadable
+  report → stand down (proceeding without knowing whether the upstream stage ran is exactly how the
+  wrong conclusion got written).
+- `test_routine_guard.py`: 13 break-the-wait cases against a throwaway report and a fake sessions
+  directory — stale report must time out rather than pass, a report that appears mid-wait must be
+  picked up (and must really have waited), missing report fails closed, a report dated tomorrow
+  fails closed, a human's interactive session is never mistaken for a routine, and the logger never
+  waits on itself. One case pins an invariant instead of a comment: the guard's idle threshold must
+  stay above the in-flight threshold of whatever reads those transcripts, or the guard says "all
+  quiet, go" while the reader still skips that session and the row vanishes for a day.
+
+### Changed
+- `blueprint.md` §6: new **H4b** section — the incident, why spreading cron times further apart is
+  not the fix, why scheduler jitter had already been truncating one row every single morning
+  (fixer at ~08:30, logger at ~08:31, fixer runs 3–4 minutes), and the generalisable lesson: **a
+  truncated measurement is more dangerous than a missing one** — a missing row announces itself,
+  while a row carrying a session id, a token count and a timestamp looks exactly like a fact.
+- `kb-autofix-daily.SKILL.md`: a step 0 that waits for today's report, and standing down when it
+  never arrives. The previous instruction — log the entry anyway, noting the report is stale — is
+  what turned one skipped beat into a confident wrong diagnosis, so it is gone.
+- `kb-audit-daily.SKILL.md`: states that it waits for nobody, and why adding a wait there would
+  create the one cycle this design does not have.
+
 ## [1.6.3] - 2026-07-31
 
 ### Fixed

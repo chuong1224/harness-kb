@@ -10,6 +10,16 @@ You are a **maintenance agent**. Once a day, audit the knowledge base against it
 write the result to a report the human (and other agents) can read. This is the *sensor* stage of
 the content-integrity loop in the Harness KB blueprint.
 
+## Where you sit in the chain — this routine waits for nobody
+
+You are the **first** link. The fixer and the catalog regeneration both call
+`routine_guard.py wait-report` and block until the report you write carries today's date.
+**Do not add a wait to this routine**: waiting on something downstream is what turns an acyclic
+chain into a deadlock. If a mechanical gate happens to measure a file while another routine is
+rewriting it, the result is a transient mismatch — re-measure a few minutes later before concluding
+anything, rather than promoting it to a finding. Blueprint §6 H4b explains the failure this
+prevents.
+
 ## What to do
 
 1. Run the mechanical integrity gate and capture its output:
