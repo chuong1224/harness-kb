@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.7.1-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -23,11 +23,30 @@ evergreen; any specific counts are illustrative snapshots, not live values._
 
 A pile of dashboards where a human still fixes everything by hand is a **cockpit**, not a harness.
 
-A real harness is a **closed control loop**:
+A real harness is a **closed control loop**: `sense deviation → decide → correct → verify → keep on
+rails`, running with minimal human intervention.
 
-```
-sense deviation  →  decide  →  correct  →  verify  →  keep on rails
-                         (with minimal human intervention)
+```mermaid
+flowchart LR
+    S["Sense<br/>gates · audits · logs"] --> D{"Decide<br/>mechanical and<br/>reversible?"}
+    D -->|yes| C["Correct<br/>auto-fix · regenerate"]
+    D -->|no| W["Worklist<br/>(stays for a human)"]
+    C --> V{"Verify<br/>gates green?"}
+    V -->|green| K["Keep on rails<br/>logged + backed up"]
+    V -->|red| R["Roll back<br/>and report"]
+    K --> S
+    R --> W
+    W --> H(["Human<br/>approves high-risk<br/>changes only"])
+    H --> S
+
+    classDef sense fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef act fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef human fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    class S,V,D sense
+    class C,K act
+    class R bad
+    class H,W human
 ```
 
 The goal is to move the human from *operator* to *supervisor* — someone who approves the
@@ -82,6 +101,46 @@ harness-kb/
 
 The example scripts are **reference implementations** — dependency-free, standard-library only —
 that make the blueprint concrete. They are meant to be read and adapted, not vendored blindly.
+
+### How the pieces run, on an ordinary morning
+
+```mermaid
+flowchart LR
+    R[("rules.json<br/>single source of truth")]
+
+    subgraph day["The daily chain"]
+        direction LR
+        AU["audit routine<br/>read-only<br/>verify_kb · check_rules_drift"]
+        RPT["Audit report<br/>(dated)"]
+        FX["auto-fix routine<br/>auto_fix.py<br/>one safe class only"]
+        LOG["Handling log<br/>+ rollback handle"]
+        CAT["catalog regen<br/>generate_catalog.py"]
+        PL["perf log<br/>reads every run"]
+        AU --> RPT --> FX --> LOG
+        RPT --> CAT
+        FX --> PL
+        CAT --> PL
+    end
+
+    R --> AU
+    R --> FX
+    G{{"routine_guard.py<br/>holds this order even when<br/>the scheduler fires them all at once"}}
+    G -.-> FX
+    G -.-> CAT
+    G -.-> PL
+
+    classDef src fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef routine fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef out fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef guard fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    class R src
+    class AU,FX,CAT,PL routine
+    class RPT,LOG out
+    class G guard
+```
+
+Everything above is a **sensor** except `auto_fix.py`, which is the only script here allowed to
+write to your notes — and it is deliberately the narrowest one.
 
 ## Quickstart
 

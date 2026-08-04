@@ -81,6 +81,43 @@ actuator.
 If most of your top-level loops sense-and-report, you have a cockpit. That is the line between
 "a very rich instrumentation rig" and "a harness in the full sense."
 
+The difference is one edge — the one that comes *back*:
+
+```mermaid
+flowchart TB
+    subgraph openloop["OPEN — a cockpit"]
+        direction TB
+        O1["Sensor<br/>(audit, gate, metric)"] --> O2["Report / dashboard"]
+        O2 --> O3(["Human reads it,<br/>decides, fixes by hand"])
+        O3 -.->|"only if they remember"| O1
+    end
+
+    subgraph closedloop["CLOSED — a harness"]
+        direction TB
+        C1["Sensor"] --> C2{"Mechanical and<br/>reversible?"}
+        C2 -->|no| C7(["Human worklist<br/>(judgment stays human)"])
+        C2 -->|yes| C3["Correct"]
+        C3 --> C4{"Verify:<br/>gates green?"}
+        C4 -->|green| C5["Done · logged · backed up"]
+        C4 -->|red| C6["Roll back automatically"]
+        C5 --> C1
+        C6 --> C7
+    end
+
+    classDef s fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef human fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    class O1,O2,C1,C2,C4 s
+    class C3,C5 good
+    class C6 bad
+    class O3,C7 human
+```
+
+Note what is *not* different: judgment still belongs to the human in both. Closing the loop does not
+mean the machine decides more — it means the machine handles the cases where there was never a
+decision to make.
+
 ---
 
 ## 5. The core architecture debt: a single source of truth
@@ -99,6 +136,41 @@ is no single generated source.
 This is the highest-leverage, lowest-risk fix, and it is a prerequisite for safely automating any
 *correction* (§6, §7). See `examples/rules/rules.example.json` for the data-as-source pattern and
 `examples/scripts/verify_kb.py` for a gate that checks notes against that single source.
+
+```mermaid
+flowchart TD
+    SRC[("rules.json<br/>the one source")]
+
+    D1["Document A<br/>restates: 7 tags<br/>carries marker rules:tag_count"]
+    D2["Document B<br/>restates: 12 indexes<br/>carries marker rules:index_count"]
+    D3["Agent prompt / skill file<br/>restates: 7 tags"]
+
+    CK{{"check_rules_drift.py<br/>compares every marked line<br/>against the source"}}
+
+    SRC --> CK
+    D1 --> CK
+    D2 --> CK
+    D3 --> CK
+
+    CK -->|"all agree"| OK["exit 0"]
+    CK -->|"any mismatch"| BAD["exit 1<br/>file:line — doc says X,<br/>source says Y"]
+    BAD --> FIX["auto_fix.py<br/>rewrites that one token<br/>(marker says where, source says what)"]
+    FIX --> CK
+
+    classDef src fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef doc fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef gate fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class SRC src
+    class D1,D2,D3 doc
+    class CK gate
+    class OK,FIX good
+    class BAD bad
+```
+
+The documents keep showing the number — they just stop *owning* it. Without the marker, every one of
+those boxes is an independent claim, and the audit's job degrades into comparing copies with copies.
 
 ### Documents may show the numbers - they just may not own them
 
@@ -239,6 +311,35 @@ decisions are the whole design:
   how), removed markers (deliberate or lost?), and anything semantic stay in the report. Widening
   the list is a decision to make in daylight — never a flag on the command line.
 
+Every one of those decisions is an exit that does **not** write:
+
+```mermaid
+flowchart TD
+    ST(["Scheduled run starts"]) --> LK{"Target file held<br/>by another stream?"}
+    LK -->|yes| DEF["Defer the whole run — exit 3<br/>never race a live editor"]
+    LK -->|no| SNAP{"Snapshot of the vault<br/>taken successfully?"}
+    SNAP -->|no| STOP["Fix nothing — exit 2<br/>no backup, no write"]
+    SNAP -->|yes| AGREE{"Checker report and the<br/>fixer's own re-read of<br/>that line agree?"}
+    AGREE -->|no| SKIP["Skip, with a reason<br/>edited since · spelled in words ·<br/>marker gone · two markers on the line"]
+    AGREE -->|yes| WR["Rewrite exactly one token"]
+    WR --> GATE{"Re-run drift check<br/>AND integrity gate"}
+    GATE -->|green| DONE["Keep it — log file:line,<br/>old → new, backup id"]
+    GATE -->|red| RB["Restore every touched file<br/>from the backup — exit 1"]
+    SKIP --> RPT["Stays in the report<br/>for a supervised session"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef hold fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef q fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    class LK,SNAP,AGREE,GATE q
+    class WR,DONE ok
+    class RB bad
+    class DEF,STOP,SKIP,RPT hold
+```
+
+The rollback edge is not an escape hatch you hope works: `test_auto_fix.py` forces a gate red on
+purpose and asserts every touched file came back.
+
 Two operational notes, both learned the hard way in the first day of review:
 
 - **Pair it with the per-file lock (H4)** if more than one stream writes — and *hold* the lock, do
@@ -281,6 +382,28 @@ block the write) + `examples/scripts/test_claim.py` (break-the-lock tests) + the
   lock that can freeze an agent session will be disabled by the first person it inconveniences, and
   then you have no lock at all.
 
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Stream A
+    participant H as PreToolUse hook
+    participant S as .claims store
+    participant B as Stream B
+
+    A->>H: Edit note.md
+    H->>S: claim note.md
+    S-->>H: free → A holds it
+    H-->>A: allowed (silent — you never see the lock)
+
+    B->>H: Edit note.md
+    H->>S: claim note.md
+    S-->>H: held by A since 09:12
+    H-->>B: exit 2 — write BLOCKED<br/>(who holds it, since when, 3 ways out)
+
+    Note over S: Claims lapse on their own:<br/>file untouched · stream gone quiet · session end
+    Note over H,B: Ambiguous input (no session id, no vault) → allow.<br/>A lock that can freeze a session gets disabled, and<br/>then you have no lock at all.
+```
+
 Two limits worth stating out loud, because a lock people over-trust is worse than none: across
 machines the guarantee is only as fast as your file sync, and only the agent's *file tools* pass
 through the hook — shell commands, scripts and desktop editors do not (deliberately: a human
@@ -306,6 +429,30 @@ their cron times. Three failures landed at once, and every routine reported succ
   appended to, recording *"audit: 9s / 149K tokens"* for a run that actually took 6m08s / 6.1M —
   and that truncated number then travelled as evidence into the work item above;
 - the catalog regeneration rewrote the file the audit was measuring at that moment.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant SCH as Scheduler (catching up)
+    participant AU as audit routine
+    participant PL as perf-log routine
+    participant FX as auto-fix routine
+    participant RPT as Audit report (file)
+
+    SCH->>AU: fire 10:11:05
+    SCH->>PL: fire 10:11:06
+    SCH->>FX: fire 10:12:54
+
+    PL->>AU: read transcript — still being written
+    Note right of PL: records "9s / 149K tokens"<br/>the run really took 6m08s / 6.1M
+
+    FX->>RPT: read 10:13:18
+    RPT-->>FX: report dated four days ago
+    Note right of FX: freezes a stale snapshot,<br/>files a work item on a false premise<br/>citing PL's truncated number as evidence
+
+    AU->>RPT: write 10:17:03
+    Note over SCH,RPT: Every routine reported success.
+```
 
 Worth stating plainly, because it generalises past scheduling: **a truncated measurement is more
 dangerous than a missing one.** A missing row announces itself. A row with a session id, a token
@@ -341,6 +488,42 @@ plus the wiring in the routine templates. Design decisions:
   invariant — idle (180s) must exceed in-flight (90s), or the guard says "all quiet, go" while the
   reader still skips that session and the row silently vanishes for a day. A test holds that line,
   not a comment.
+
+The same five routines, with the order restored — and note that each timeout has a *different*
+right answer:
+
+```mermaid
+flowchart LR
+    AU["audit<br/>waits for nobody<br/>(first link — adding a wait<br/>here creates the cycle)"]
+    RPT["Report carrying<br/>today's date"]
+    W1{{"wait-report"}}
+    W2{{"wait-report"}}
+    W3{{"wait-quiet"}}
+    FX["auto-fix"]
+    CAT["catalog regen"]
+    PL["perf log"]
+
+    AU --> RPT
+    RPT --> W1 --> FX
+    RPT --> W2 --> CAT
+    FX --> W3 --> PL
+    CAT --> W3
+
+    W1 -.->|"timed out"| T1["stand down<br/>no entry, no work item<br/>a wrong log costs more<br/>than a missing one"]
+    W2 -.->|"timed out"| T2["run anyway<br/>regeneration is safe<br/>and idempotent"]
+    W3 -.->|"timed out"| T3["run anyway<br/>the reader skips live<br/>sessions by itself"]
+
+    classDef routine fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef guard fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef out fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef stop fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef go fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class AU,FX,CAT,PL routine
+    class W1,W2,W3 guard
+    class RPT out
+    class T1 stop
+    class T2,T3 go
+```
 
 *(Optional, later — H5: feed the cost/performance logs into a threshold that warns or suggests a
 cheaper model when a scheduled run exceeds its token budget.)*

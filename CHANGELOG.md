@@ -4,6 +4,31 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-08-04
+
+### Added
+- **Seven diagrams.** The repo explained a control loop entirely in prose, which is a strange thing
+  for a document whose central claim is that one edge — the one that comes *back* — separates a
+  cockpit from a harness. Mermaid, so the diagrams stay diffable text with no binary assets and no
+  build step, consistent with the zero-dependency rule everywhere else here.
+
+  - `README.md`: the closed loop itself, and a map of how the shipped artifacts run on an ordinary
+    morning (which script is a sensor, which one is allowed to write, where the guard sits).
+  - `blueprint.md` §4: open loop vs. closed loop side by side — the point being that judgment stays
+    with the human in *both*; closing the loop only removes the cases where there was no decision
+    to make.
+  - §5: the single source of truth, the marked restatements, the drift checker, and the fix path
+    that feeds back into it.
+  - §6 H2: the auto-fixer as a flowchart, drawn so that every refusal is visible — held file,
+    failed snapshot, disagreeing sources, red gate — because the refusals are the design.
+  - §6 H4: a sequence diagram of two streams racing for one file and the hook returning exit 2.
+  - §6 H4b: the incident as a timeline (who read what, at what second, while the audit was still
+    writing), plus the repaired chain showing that each of the three timeouts has a *different*
+    correct answer.
+
+  Labels avoid `<b>`/`<i>`; renderers that sanitise HTML in node labels would otherwise print the
+  tags as literal text. `<br/>` is handled in every mode and is the only markup used.
+
 ## [1.7.0] - 2026-08-04
 
 ### Added
