@@ -4,6 +4,41 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-08-04
+
+### Fixed
+- **A marker now owns the text before it, so a number belongs to exactly one claim.** The drift
+  checker matched each claim's patterns across the whole line and took the first hit, so a line
+  carrying two markers of the same unit handed *both* of them the leftmost number. The consequences
+  went in two directions and the second one is the reason this needed fixing at the sensor:
+
+  - the report named the wrong token — it said "document says 16" about a marker whose number,
+    plainly visible to a human, was 7;
+  - `auto_fix.py` then planned two rewrites at one column and had to refuse the line entirely.
+    A rule appeared in the README to protect the tool from itself: *at most one marker per unit per
+    line.* Rules that exist because a sensor is ambiguous tend to outlive anyone's memory of why.
+
+  `check_rules_drift.marker_segments()` now cuts the line at the markers and reads each number in
+  the segment running from the previous marker up to this one. A line with a single numeric marker
+  still reads the whole line, so no existing document changes behaviour and nobody has to move a
+  marker to sit right after its number.
+
+- **`auto_fix.owned_window()` keeps the fixer inside the same boundary.** Making only the checker
+  position-aware would have opened a quieter hole: when two markers on a line carry numbers that are
+  *already equal*, exactly one fix is planned, nothing overlaps, and `drop_ambiguous` — the guard
+  built for this family of bugs — never sees it. A fixer re-searching the whole line would then
+  rewrite the leftmost match, which is the number that was already correct, and leave the wrong one
+  standing. Test `9b` is that case; it fails on the previous fixer.
+
+  `drop_ambiguous` stays as a last-resort invariant (disjoint segments mean two valid fixes can no
+  longer overlap) with test `9c` calling it directly, because a guard nothing can trigger is a guard
+  nobody notices breaking.
+
+- Tests: two cases in `test_drift_check.py` (both numbers right ⇒ no false alarm; second number
+  wrong ⇒ the drift is reported against the number that marker owns) and three in `test_auto_fix.py`
+  (`9`, `9b`, `9c`). Each new case was **run against the old behaviour first and observed to fail** —
+  a case that passes both before and after proves nothing.
+
 ## [1.7.1] - 2026-08-04
 
 ### Added

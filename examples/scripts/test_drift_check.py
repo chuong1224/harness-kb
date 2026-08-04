@@ -13,6 +13,7 @@ Run from the repository root:
 Exit code 0 = every case passed, 1 = at least one case failed.
 Zero dependencies: Python 3.8+, standard library only.
 """
+import json
 import shutil
 import subprocess
 import sys
@@ -135,6 +136,36 @@ def main() -> int:
             "# Scratch\n\nWorking notes, not a note in the vault.\n",
         ),
         "DRIFT 'index_count'",
+    )
+
+    # Two markers of the SAME unit on one line. The fixture adds a second claim that
+    # reuses the `tags` pattern but points at a different count - what the two claims
+    # mean does not matter here, only that one pattern matches both numbers. A whole-line
+    # scan hands the leftmost number to both markers: the pair below pins down both ways
+    # that goes wrong. Without the clean case, "it reported drift" could just mean it
+    # reported the wrong number and happened to be right about there being a problem.
+    def two_markers(vault, rules, second):
+        text = json.loads(rules.read_text(encoding="utf-8"))
+        text["documents"]["claim_types"]["subset_count"] = {
+            "description": "same unit as tag_count, different source - the collision case",
+            "source": "area_count", "patterns": [r"(\d+)\s*tags?\b"]}
+        rules.write_text(json.dumps(text, ensure_ascii=False, indent=2), encoding="utf-8")
+        facts = json.loads(subprocess.run(
+            [sys.executable, str(CHECKER), str(vault), "--rules", str(rules), "--show"],
+            capture_output=True, text=True, encoding="utf-8").stdout)
+        with open(vault / RULES_DOC, "a", encoding="utf-8", newline="") as fh:
+            fh.write("\nSummary: %d tags <!-- rules:tag_count --> of which %d tags "
+                     "<!-- rules:subset_count -->\n"
+                     % (facts["tag_count"], second(facts["area_count"])))
+
+    clean_case(
+        "two markers of one unit, both numbers right: no false alarm",
+        lambda v, r: two_markers(v, r, lambda areas: areas),
+    )
+    case(
+        "two markers of one unit: drift is reported against the number that marker owns",
+        lambda v, r: two_markers(v, r, lambda areas: areas - 1),
+        "DRIFT 'subset_count'",
     )
 
     print(f"\n{'all cases passed' if failures == 0 else str(failures) + ' case(s) failed'}")

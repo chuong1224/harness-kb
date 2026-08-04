@@ -54,6 +54,39 @@ def strip_markup(line, marker_re):
     return marker_re.sub(" ", line).replace("**", "").replace("`", "")
 
 
+def marker_segments(line, marker_re, claim_types):
+    """[(claim, the text that marker OWNS, was it cut)] in the order the markers appear.
+
+    A marker owns the text between the previous marker and itself, because a marker is
+    written just after the number it guards.
+
+    With ONE numeric claim on the line the segment is the WHOLE line, exactly as before.
+    Nothing forces an author to put the marker after the number when there is nothing to
+    confuse it with.
+
+    Two or more numeric claims is where the whole-line scan used to break: it took the
+    FIRST pattern match and handed it to every claim, so the second marker reported a
+    number belonging to the first. That is wrong twice over - the report points at the
+    wrong token, and an auto-fixer working from that report aims two rewrites at one
+    column and has to refuse the line. Cutting per marker removes the ambiguity at the
+    sensor instead of teaching every consumer to work around it.
+    """
+    occurrences = [(m.group(1), m.start(), m.end()) for m in marker_re.finditer(line)]
+    numeric = [c for c, _s, _e in occurrences
+               if (claim_types.get(c) or {}).get("kind") != "list"]
+    if len(numeric) <= 1:
+        whole = strip_markup(line, marker_re)
+        return [(claim, whole, False) for claim, _s, _e in occurrences]
+    # Blank the markers with SAME-LENGTH spaces: strip_markup deletes them, which shifts
+    # every offset, and cutting a segment needs offsets that still match the raw line.
+    blanked = marker_re.sub(lambda m: " " * len(m.group(0)), line)
+    segments, previous_end = [], 0
+    for claim, start, end in occurrences:
+        segments.append((claim, blanked[previous_end:start].replace("**", "").replace("`", ""), True))
+        previous_end = end
+    return segments
+
+
 def is_excluded(path, vault, scan):
     prefixes = tuple(scan.get("exclude_dir_prefixes", [".", "_"]))
     # `attachments/` holds a note's supporting files, so a stray .md in there is a
@@ -147,12 +180,12 @@ def check_document(vault, rules, facts, consumer, marker_re):
 
     seen, marked_lines = set(), set()
     for i, line in enumerate(lines):
-        claims = marker_re.findall(line)
-        if not claims:
+        segments = marker_segments(line, marker_re, claim_types)
+        if not segments:
             continue
         marked_lines.add(i)
         clean = strip_markup(line, marker_re)
-        for claim in claims:
+        for claim, segment, owned in segments:
             seen.add(claim)
             spec = claim_types.get(claim)
             if spec is None:
@@ -163,12 +196,13 @@ def check_document(vault, rules, facts, consumer, marker_re):
             expected = facts.get(spec.get("source"))
             found = None
             for pattern in spec.get("patterns", []):
-                m = re.search(pattern, clean)
+                m = re.search(pattern, segment)
                 if m:
                     found = int(m.group(1))
                     break
             if found is None:
-                errors.append(f"{rel}:{i+1}: marker '{claim}' but no number readable on the line -> {clean.strip()[:90]}")
+                where = "in the text this marker owns" if owned else "on the line"
+                errors.append(f"{rel}:{i+1}: marker '{claim}' but no number readable {where} -> {clean.strip()[:90]}")
             elif found != expected:
                 errors.append(f"{rel}:{i+1}: DRIFT '{claim}' - document says {found}, source of truth says {expected} -> {clean.strip()[:90]}")
 

@@ -14,7 +14,9 @@ never damage anything.
   6. --rollback restores the state from before a run
   7. files the rules file does not register are never touched
   8. a CRLF file is still CRLF afterwards - a one-token fix must not rewrite every line
-  9. a line whose markers collide is refused outright, never half-fixed
+  9. two markers sharing a pattern: each number is fixed in its own slot
+  9b. ...even when both numbers are already equal, which no overlap check can catch
+  9c. the last-resort overlap guard is still alive
 
 Usage: python test_auto_fix.py
 Exit:  0 = all pass, 1 = at least one failure
@@ -195,10 +197,13 @@ def main():
 
     # 9 - two markers on ONE line that share a pattern -------------------------
     # The dangerous shape is two claims with DIFFERENT sources but the same number
-    # pattern. Fixing the left one writes a value equal to what the right one currently
-    # reads, so a fixer that re-searches the line lands on the token it just wrote:
-    # the correct number gets overwritten and the wrong one survives.
-    with Sandbox() as box:
+    # pattern. This line used to be refused outright: the checker scanned the whole line
+    # and handed both markers the leftmost number, so two fixes aimed at one column.
+    # Each marker now owns the text before it, on both sides, so the line is fixable -
+    # every number is rewritten in its own slot.
+    def collision_box(second):
+        """Sandbox whose rules define a second claim sharing the `tags` pattern."""
+        box = Sandbox().__enter__()
         rules = json.loads(box.rules.read_text(encoding="utf-8"))
         rules["documents"]["claim_types"]["tag_count_alias"] = {
             "description": "same unit as tag_count, different source - the collision case",
@@ -208,21 +213,58 @@ def main():
             [sys.executable, str(HERE / "check_rules_drift.py"), str(box.vault),
              "--rules", str(box.rules), "--show"],
             capture_output=True, text=True, encoding="utf-8").stdout)
-        tags, areas = facts["tag_count"], facts["area_count"]
         doc = box.vault / rules["documents"]["consumers"][0]["path"]
         with open(doc, "a", encoding="utf-8", newline="") as fh:
             fh.write("\nSummary: %d tags <!-- rules:tag_count --> of %d tags "
-                     "<!-- rules:tag_count_alias -->\n" % (tags - 3, tags))
+                     "<!-- rules:tag_count_alias -->\n"
+                     % (facts["tag_count"] - 3, second(facts)))
+        want = ("Summary: %d tags <!-- rules:tag_count --> of %d tags "
+                "<!-- rules:tag_count_alias -->" % (facts["tag_count"], facts["area_count"]))
+        return box, doc, want
+
+    box, doc, want = collision_box(lambda f: f["tag_count"])
+    try:
         planned = json.loads(box.run("--json")[1])
         code, out = box.run("--apply")
         line = next((l for l in doc.read_text(encoding="utf-8").splitlines()
                      if l.startswith("Summary:")), "line gone")
-        untouched = line.startswith("Summary: %d tags" % (tags - 3))
-        refused = any("same number" in s["why"] for s in planned["skipped"])
-        report("9 - ambiguous line (two markers, one number) is refused, not guessed",
-               code == 0 and not planned["fixes"] and refused and untouched,
-               "exit=%d, fixes=%d, refused=%s | %s"
-               % (code, len(planned["fixes"]), refused, line))
+        report("9 - two markers sharing a pattern: each number fixed in its own slot",
+               code == 0 and len(planned["fixes"]) == 2 and line == want,
+               "exit=%d, fixes=%d | %s" % (code, len(planned["fixes"]), line))
+    finally:
+        box.__exit__()
+
+    # 9b - the same line with both numbers ALREADY EQUAL. Only one fix is planned, so
+    # nothing overlaps and drop_ambiguous never sees it; a fixer searching the whole line
+    # would rewrite the leftmost match - the number that is already correct - and leave
+    # the wrong one standing. This is the case owned_window exists for.
+    box, doc, want = collision_box(lambda f: f["tag_count"] - 3)
+    try:
+        code, out = box.run("--apply")
+        line = next((l for l in doc.read_text(encoding="utf-8").splitlines()
+                     if l.startswith("Summary:")), "line gone")
+        report("9b - equal numbers under two markers: the other marker's token is safe",
+               code == 0 and line == want, "exit=%d | %s" % (code, line))
+    finally:
+        box.__exit__()
+
+    # 9c - the overlap guard must still be alive. Disjoint segments mean production can
+    # no longer produce an overlapping pair, so call it directly: a guard nobody can
+    # trigger is a guard nobody would notice breaking.
+    import importlib.util
+    _spec = importlib.util.spec_from_file_location("auto_fix_mod", SCRIPT)
+    _af = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_af)
+    overlapping = [
+        {"file": "x.md", "line": 1, "claim": "tag_count", "got": 5, "want": 7,
+         "col": 10, "end": 11},
+        {"file": "x.md", "line": 1, "claim": "tag_count_alias", "got": 5, "want": 5,
+         "col": 10, "end": 11},
+    ]
+    kept, skipped = _af.drop_ambiguous(list(overlapping), [])
+    report("9c - last-resort guard still refuses two fixes aimed at one token",
+           kept == [] and any("same number" in s["why"] for s in skipped),
+           "kept=%d, skipped=%d" % (len(kept), len(skipped)))
 
     # 10 - every neighbour is invoked in a shape that neighbour accepts ---------
     # The bug this exists for: a companion tool built on argparse SUBPARSERS wants its

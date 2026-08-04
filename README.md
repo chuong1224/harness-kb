@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.7.1-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.8.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -190,10 +190,13 @@ file it touches, re-runs both gates afterwards, and rolls the whole run back if 
 Incomplete enumerations, removed markers and anything semantic stay in the report for a human —
 widening that list should be a decision, not a flag.
 
-One rule the marker pattern depends on: **at most one marker per unit per line.** The drift checker
-matches its patterns across the whole line, so two markers of the same unit both get handed the
-leftmost number — the report is wrong before the fixer ever sees it. The fixer detects that overlap
-and refuses the line instead of guessing, but the real fix is to keep each claim on its own line.
+**A marker owns the text before it.** Put as many markers on a line as you like: the checker reads
+each number inside the segment running from the previous marker up to this one, so a total and a
+subset written as "N tags" twice on one line are attributed correctly and the fixer rewrites each in
+its own slot. (Earlier versions matched patterns across the whole line and handed both markers the
+leftmost number — the report was wrong before the fixer ever saw it, and the fixer had to refuse
+such lines. Lines carrying a single numeric marker still read the whole line, so nothing forces you
+to put the marker right after the number.)
 
 Both checkers exit `0` when clean and `1` when they find problems — so you can wire them into a
 commit hook or a scheduled job as a hard gate. Point them at `examples/demo-vault` to see real

@@ -144,13 +144,38 @@ def mask(line):
     return out.replace("**", "  ").replace("`", " ")
 
 
-def locate(line, patterns, got):
+def owned_window(line, claim, claim_types):
+    """(lo, hi) slice of the line that `claim` owns, or None meaning the whole line.
+
+    The twin of check_rules_drift.marker_segments: the checker now reads each number
+    inside the segment belonging to its own marker, so the fixer has to look for the
+    token in that same segment. Without this, a line carrying two markers whose numbers
+    happen to be EQUAL sends finditer to the first occurrence - the other marker's
+    number - and the fix lands on the wrong token: the correct number becomes wrong and
+    the wrong one survives. drop_ambiguous cannot catch that one, because a single fix
+    is planned and nothing overlaps.
+    """
+    occurrences = [(m.group(1), m.start(), m.end()) for m in MARKER_RE.finditer(line)]
+    numeric = [c for c, _s, _e in occurrences
+               if (claim_types.get(c) or {}).get("kind") != "list"]
+    if len(numeric) <= 1:
+        return None
+    previous_end = 0
+    for name, start, end in occurrences:
+        if name == claim and (claim_types.get(name) or {}).get("kind") != "list":
+            return (previous_end, start)
+        previous_end = end
+    return None
+
+
+def locate(line, patterns, got, window=None):
     """Span of the number token to rewrite, or None when we are not certain."""
     masked = mask(line)
+    lo, hi = window if window else (0, len(masked))
     for pat in patterns:
-        for m in re.finditer(pat, masked):
+        for m in re.finditer(pat, masked[lo:hi]):
             if m.group(1) == str(got):
-                return m.span(1)
+                return (lo + m.start(1), lo + m.end(1))
     return None
 
 
@@ -182,8 +207,8 @@ def claims_release(vault, stream):
 
 
 def plan(vault, rules_path, rules, report):
-    patterns_of = {k: v.get("patterns", []) for k, v in
-                   rules.get("documents", {}).get("claim_types", {}).items()}
+    claim_types = rules.get("documents", {}).get("claim_types", {})
+    patterns_of = {k: v.get("patterns", []) for k, v in claim_types.items()}
     fixes, skipped = [], []
     for err in report.get("errors", []):
         m = DRIFT_RE.match(err)
@@ -204,7 +229,8 @@ def plan(vault, rules_path, rules, report):
         if not MARKER_RE.search(line):
             skipped.append({"why": "line no longer carries a marker", "detail": err})
             continue
-        span = locate(line, patterns_of.get(claim, []), got)
+        span = locate(line, patterns_of.get(claim, []), got,
+                      owned_window(line, claim, claim_types))
         if span is None:
             skipped.append({"why": "could not locate the number on that line", "detail": err})
             continue
@@ -218,13 +244,17 @@ def plan(vault, rules_path, rules, report):
 def drop_ambiguous(fixes, skipped):
     """Two fixes aiming at the SAME number token: skip both rather than pick one.
 
-    This happens when a line carries two markers of the same unit (say a total and a
-    subset, both written as "N tags"). The checker scans patterns across the whole line,
-    so it hands BOTH claims the leftmost number - its report is already wrong for the
-    second claim - and the two fixes land on one column with two different values.
-    Nothing in the data says which marker owns which number, so the honest move is to
-    leave the line alone and let a human split it. Fixing one and rolling the batch back
-    would also throw away the legitimate fixes made in other files.
+    This used to happen whenever a line carried two markers of the same unit (say a total
+    and a subset, both written as "N tags"): the checker scanned patterns across the whole
+    line, handed BOTH claims the leftmost number, and the two fixes landed on one column
+    with two different values.
+
+    That is fixed at the sensor now - each marker owns the text before it, and owned_window
+    keeps the fixer inside the same boundary - so two legitimate fixes can no longer overlap
+    and this guard should never fire in practice. It stays as a last-resort invariant: if
+    someone widens claim_types.patterns until two segments bleed into each other, the run
+    must REFUSE rather than overwrite a number it cannot attribute. Fixing one and rolling
+    the batch back would also throw away the legitimate fixes made in other files.
     """
     by_slot = {}
     for f in fixes:

@@ -347,11 +347,14 @@ Two operational notes, both learned the hard way in the first day of review:
   through the tool hook, so nothing else is holding it for you. A file another stream holds should
   defer the entire run rather than race it: an auto-fixer that fights a live editor is a corruption
   engine with good intentions.
-- **Keep one marker per unit per line.** The checker matches patterns across the whole line, so two
-  markers of the same unit both receive the leftmost number and the *report itself* is wrong before
-  any fix is attempted. The fixer refuses such lines, but the durable answer is to attribute numbers
-  by marker position in the checker — a sensor whose ambiguity a downstream tool has to work around
-  is a sensor with a bug.
+- **Attribute numbers by marker position, in the checker.** Matching patterns across the whole line
+  hands every marker of that unit the leftmost number, so the *report itself* is wrong before any fix
+  is attempted; the fixer can only refuse such lines. Give each marker the text from the previous
+  marker up to itself and the ambiguity disappears at the sensor — a sensor whose ambiguity a
+  downstream tool has to work around is a sensor with a bug, and "keep one marker per unit per line"
+  was a rule invented to protect the tool from itself. Note the one case a duplicate-target check
+  cannot cover: when both numbers on the line are *already equal*, only one fix is planned, nothing
+  overlaps, and a fixer that re-searches the whole line quietly rewrites the number that was right.
 
 ### H3 — Turn retrieval signals into actions
 Metrics (frequently re-read notes, long retrieval chains, isolated hot notes) currently just sit on
