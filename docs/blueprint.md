@@ -317,6 +317,49 @@ cleanup fails, not by what happens when it succeeds.** The auto-fixer in H2 earn
 its refusals; a destructive test earns its keep through its restore path. Both are only as good as
 the path nobody watches.
 
+### Measure the curve, not the snapshot
+
+A knowledge base that an agent maintains does not fail abruptly. It degrades: notes accumulate,
+newer ones compete with older ones for the same query, the folder a fact lives in slowly stops
+matching what the fact is about. Every individual step looks fine. That is exactly why a single
+measurement cannot find it — a snapshot tells you today's number, and today's number always looks
+reasonable in isolation.
+
+Most projects already own the instruments and never notice they are being used wrong. Ours did: a
+retrieval self-test last run at 74 notes, a graph-health report last run at 144, a cost log measuring
+*per scheduled job* rather than per unit of store. Three readings, three different weeks, three
+different scales — and no way to answer the only question that matters: **is this getting better or
+worse as it grows?**
+
+Fix the axis, not the instruments. Record one row per measurement — date, store size, answer quality,
+retrieval **cost**, structural health — append it to a data file the machine owns, and render it as a
+table. Four properties make the difference between a log and a curve:
+
+- **Size is the x-axis, not time.** "Cost went up in August" invites excuses. "Cost went up between
+  74 and 163 notes" is a claim you can act on.
+- **Show the delta, not just the value.** Absolute numbers sit inside their thresholds for a long
+  time while quietly drifting toward them. The eye should land on the change.
+- **Record the bad runs too.** A curve that only gets written when the gate is green is a curve that
+  documents nothing. Ours writes the point and reports the failing gate alongside it.
+- **Missing is not zero.** Backfilled points from an old log, and columns an instrument could not
+  produce, must render as *unknown* and be marked as such. A fabricated cell is worse than a blank
+  one: blanks are honest about the horizon, fabrications poison every comparison drawn across them.
+
+Two traps worth naming. First, if a metric already exists elsewhere, **import the function, do not
+reimplement the calculation** — two tools counting the same store and disagreeing is a failure this
+project has hit repeatedly, and it is worst when the two numbers happen to coincide by accident.
+Second, resist gating on the curve the moment you have it. The curve is evidence; choosing the
+threshold that turns evidence into a refusal is a judgement call, and it belongs to a person.
+
+The payoff is a question the loop could not previously answer at all. The framing is not ours: it
+comes from Zhou et al., *Filesystem-Based Memory for LLM Agents: Organization, Evolution, and
+Sustainability* ([arXiv:2607.26637](https://arxiv.org/abs/2607.26637)), which measures answer
+quality, cost, and store health *as functions of store size* rather than at a point. Their finding
+is the reason the headline column here is cost rather than correctness: organised stores roughly
+halve retrieval cost on large material, while answer quality barely moves — *"quality benchmarks
+remain largely blind to shape."* A metric blind to the thing you are trying to protect makes a poor
+alarm, however reassuring it looks.
+
 ---
 
 ## 6. Roadmap: closing the loops

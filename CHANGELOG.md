@@ -4,6 +4,39 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-05
+
+### Added
+- **Blueprint §5: "Measure the curve, not the snapshot."** An agent-maintained knowledge base does
+  not fail abruptly, it degrades — notes accumulate, new ones compete with old ones for the same
+  query, the folder a fact lives in slowly stops matching what the fact is about. Every step looks
+  fine, which is precisely why one measurement cannot find it.
+
+  Most projects already own the instruments and are using them on the wrong axis. Ours did: a
+  retrieval self-test last run at 74 notes, a graph-health report last run at 144, a cost log
+  measuring per scheduled job rather than per unit of store. Three readings, three weeks, three
+  scales, and no way to answer the only question that matters — is this getting better or worse as
+  it grows?
+
+  The section gives the four properties that separate a curve from a log: **size on the x-axis**, not
+  time ("cost rose between 74 and 163 notes" is actionable; "cost rose in August" invites excuses);
+  **show the delta**, because absolute numbers sit inside their thresholds for a long time while
+  drifting toward them; **record the bad runs**, since a curve written only when the gate is green
+  documents nothing; and **missing is not zero** — backfilled or unavailable cells must render as
+  unknown, because a fabricated cell poisons every comparison drawn across it.
+
+  Plus two traps: import the existing metric function rather than reimplementing the calculation
+  (two tools counting the same store and disagreeing is a failure this project has hit repeatedly,
+  and it is worst when the two numbers coincide by accident), and resist gating on the curve the
+  moment you have it — the curve is evidence; choosing the threshold that turns evidence into a
+  refusal is a judgement that belongs to a person.
+
+  The framing is credited, not ours: Zhou et al., *Filesystem-Based Memory for LLM Agents*
+  (arXiv:2607.26637), which measures quality, cost and store health as functions of store size rather
+  than at a point, and finds that organised stores roughly halve retrieval cost on large material
+  while answer quality barely moves — *"quality benchmarks remain largely blind to shape."* Hence the
+  headline column is cost, with quality beside it rather than in front of it.
+
 ## [1.9.0] - 2026-08-05
 
 ### Added
