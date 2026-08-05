@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-08-05
+
+### Added
+- **Blueprint §5: "A test that breaks a real document must be able to put it back — or shout."**
+  Contract-breaking tests are the ones worth having, and the tempting way to write them — corrupt the
+  *real* document, assert the checker goes red, restore in `finally` — makes the test a process that
+  deliberately writes wrong data into the source of truth, with one ordinary `try/finally` standing
+  between that and a corrupted vault.
+
+  `finally` is not a guarantee. On a synced folder it fails for a boring reason: the file is locked
+  by the sync client or an open editor. The restore raises, the run continues, the document stays
+  wrong. This happened twice in the source project; the second time the suite lowered a tag count by
+  one *inside the rules document itself* and left it there, while every visible signal stayed
+  plausible — the same two suites red they had been for days. Nothing reported that the constitution
+  had been edited.
+
+  The section gives the two ways out in order: **sandbox** the fixture vault and break the copy —
+  which is what this repo's `test_auto_fix.py` already does, and why the repo never had this bug — or,
+  when the test must exercise real production data, **guard** it: snapshot to disk outside the vault
+  before breaking anything, restore atomically with a retry that outlives a sync pause, then verify
+  byte-for-byte at the end and be loud plus non-zero if anything still differs. Plus the cascade trap:
+  build each case from the snapshot, never from what is currently on disk, or one failed restore
+  silently becomes the "original" for every case that follows.
+
+  Generalised: *a mechanism that writes must be judged by what happens when its cleanup fails, not by
+  what happens when it succeeds.* The H2 auto-fixer earns its keep through its refusals; a destructive
+  test earns its keep through its restore path. Both are only as good as the path nobody watches.
+
 ## [1.8.1] - 2026-08-04
 
 ### Fixed

@@ -268,6 +268,55 @@ mistyped path found no suites, reported green, and wrote a green marker — afte
 silent forever. **The dangerous failure mode of a gate is not a false alarm, it is quiet
 reassurance.** Test for that case explicitly.
 
+### A test that breaks a real document must be able to put it back — or shout
+
+Contract-breaking tests are the ones worth having: they corrupt a number, run the checker, and demand
+it goes red. The temptation is to run them against the **real** documents, because that is what
+proves the production path works end to end. The cost is easy to miss. Such a test is, for a few
+milliseconds at a time, a process that deliberately writes wrong data into your source of truth — and
+the only thing standing between that and a corrupted vault is a `finally` block.
+
+`finally` is not a guarantee. It is ordinary code that can fail like any other, and on a synced
+folder it fails for a boring reason: the file is locked. A sync client is uploading it, an editor has
+it open, another process is holding it. The restore raises, the test moves on, and the document stays
+wrong.
+
+This is not hypothetical. It happened twice in the source project. The second time, the damage was
+measured precisely: the suite lowered a tag count by one **inside the rules document itself** and
+left it there. Every visible signal stayed plausible — two suites red, which they had been for days.
+Nothing said *the constitution has been edited.* It was only caught because of a habit written down
+after the first occurrence: **when the tooling gate goes red, immediately run the drift checker** —
+not to see which suite failed, but to see whether the suites left the vault dirty.
+
+Two ways out, in order of preference:
+
+- **Sandbox it.** Copy the fixture vault into a temp directory and break the copy. Nothing real is
+  ever at risk, and the test can be as violent as it likes. This is what `test_auto_fix.py` in this
+  repo does, which is why the repo never had this bug. Prefer this whenever the fixture can
+  faithfully stand in for the real thing.
+- **Guard it,** when the whole point of the test is that it exercises real production data and a
+  fixture would quietly diverge from it. Then the restore path needs three things it almost never
+  has by default:
+  1. **Snapshot to disk, outside the vault, before breaking anything.** An in-memory copy dies with
+     the process; a copy on disk lets the *next* session repair what this one abandoned. Write a
+     manifest next to it so recovery needs no guesswork.
+  2. **Restore atomically, and retry.** Write to a temp file beside the target and rename over it, so
+     a kill mid-write cannot leave a half-file. Then retry on `PermissionError` with a growing wait —
+     a sync client usually releases within seconds. Give up only after that.
+  3. **Verify at the end, and be loud when you fail.** Compare bytes against the snapshot; if
+     anything still differs, say so on stderr with the recovery path and the exact restore command,
+     and raise the exit code. A test that quietly leaves damage behind is worse than a test that
+     fails, because a failure gets investigated.
+
+One more trap, cheap to avoid: build each case's broken content from the **snapshot**, never from
+what is currently on disk. Read the file back and one failed restore silently becomes the "original"
+for every case that follows.
+
+The general rule this belongs to: **a mechanism that writes must be judged by what happens when its
+cleanup fails, not by what happens when it succeeds.** The auto-fixer in H2 earns its keep through
+its refusals; a destructive test earns its keep through its restore path. Both are only as good as
+the path nobody watches.
+
 ---
 
 ## 6. Roadmap: closing the loops
