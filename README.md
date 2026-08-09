@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.10.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.11.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -87,6 +87,8 @@ harness-kb/
 │   ├── scripts/auto_fix.py       Fixes the one safe class of drift — backup, gate, rollback (H2)
 │   ├── scripts/test_auto_fix.py  Break-the-fixer tests, including a forced rollback
 │   ├── scripts/generate_catalog.py  Triage catalog for agent retrieval — `--check` gates staleness
+│   ├── scripts/worklist.py       Retrieval signals → stable, review-only proposals (H3)
+│   ├── scripts/test_worklist.py  Break-the-worklist tests: thresholds, IDs, no auto-apply
 │   ├── scripts/claim.py          Per-file lock so parallel agents can't clobber each other (H4)
 │   ├── scripts/test_claim.py     Break-the-lock tests for the claim lock
 │   ├── scripts/tooling_selfcheck.py  Runs your tooling's test suites — the gate that runs the gates
@@ -139,8 +141,9 @@ flowchart LR
     class G guard
 ```
 
-Everything above is a **sensor** except `auto_fix.py`, which is the only script here allowed to
-write to your notes — and it is deliberately the narrowest one.
+Everything above is read-only except `auto_fix.py`, which is the only script here allowed to write
+to your notes — and it is deliberately the narrowest one. `worklist.py` is the decision boundary:
+it turns measurements into exact proposals but still leaves every semantic change to a reviewer.
 
 ## Quickstart
 
@@ -171,6 +174,9 @@ python examples/scripts/auto_fix.py /path/to/your/vault --rules examples/rules/r
 
 # 7. Before a routine that consumes the audit: block until today's report exists (H4b)
 python examples/scripts/routine_guard.py wait-report --report "/path/to/Audit Report.md"
+
+# 8. Turn one retrieval-health snapshot into a stable, review-only worklist (H3)
+python examples/scripts/worklist.py insight.json --out worklist.json
 ```
 
 > **Put these scripts inside the vault they serve.** A machine with the notes but without the tools
@@ -231,6 +237,10 @@ hook chặn thẳng lệnh ghi khi stream khác đang giữ file, và im lặng 
 gì; bản sao thứ hai ở máy khác thì tự do lệch đi mà audit không thấy — vì audit chỉ quét vault. Hai
 máy còn vá tay được; nhiều máy thì số bản sao tăng tuyến tính còn khả năng chúng khớp nhau thì
 không. Phép thử: **clone vault sang máy trắng — chạy gate được không?**
+
+**H3 đã có reference implementation:** `worklist.py` nhận đúng một snapshot sức khoẻ truy xuất,
+chuyển nó thành đề xuất có ưu tiên, ID ổn định, đích và bằng chứng cụ thể, nhưng luôn giữ
+`auto_apply: false`. Script không tự đo lại tín hiệu và không sửa, link, move hay merge note.
 
 Chi tiết đầy đủ: **[docs/blueprint.md](./docs/blueprint.md)** (tiếng Anh).
 

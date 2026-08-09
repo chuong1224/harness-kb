@@ -448,11 +448,31 @@ Two operational notes, both learned the hard way in the first day of review:
   cannot cover: when both numbers on the line are *already equal*, only one fix is planned, nothing
   overlaps, and a fixer that re-searches the whole line quietly rewrites the number that was right.
 
-### H3 — Turn retrieval signals into actions
+### H3 — Turn retrieval signals into actions  *(reference implementation included)*
 Metrics (frequently re-read notes, long retrieval chains, isolated hot notes) currently just sit on
 a dashboard. Close the loop by **generating suggestions** — "link notes A and B", "merge two notes
 on the same topic", "note X is an orphan, add it to an index" — into an actionable worklist, instead
 of waiting for a human to read the dashboard and infer the fix.
+
+**Shipped here:** `examples/scripts/worklist.py` + `examples/scripts/test_worklist.py`. The reference
+implementation draws a hard line between measurement and decision: it consumes one immutable
+retrieval-health snapshot and never reimplements the upstream sensor. Its output is deterministic
+and reviewable — every proposal has a stable ID, priority, exact source/target and triggering
+evidence — while `mode: proposal_only`, `auto_apply: false` and `review_required: true` make the
+safety boundary explicit to every downstream UI or agent.
+
+Four proposal classes make the output actionable without pretending that semantic edits are safe:
+
+- connect an unseen/orphaned note to the index candidate measured upstream, or ask for index review
+  when the sensor has no candidate instead of guessing across areas;
+- reduce repeated reads only after the signal crosses a fixed threshold;
+- shorten a long retrieval route, grouping repeated routes by the same first and last note;
+- review a high-margin scope-leakage section against the exact sibling target found by the sensor.
+
+Caps keep each signal class from flooding the queue, then a global limit bounds the rendered list
+without hiding the true total. Stable IDs make repeated runs idempotent and let a reviewer track a
+proposal across refreshes. None of this edits, links, moves or merges a note: the worklist closes the
+dashboard-to-decision gap while semantic correction deliberately remains supervised.
 
 ### H4 — Mechanical coordination instead of convention  *(reference implementation included)*
 If multiple agents/sessions share the KB, replace "please check the version before editing" with a
@@ -654,7 +674,8 @@ The KB qualifies as a harness in the full sense when these are **measurable**:
 - [x] **At least one class of mechanical error is auto-fixed** by the audit (no manual session),
       with a log and a rollback proving it is safe (via H2 — marked count claims; the rollback path
       is exercised by a test that forces the post-fix gate red).
-- [ ] **Retrieval signals become an actionable worklist**, not just a dashboard (via H3).
+- [x] **Retrieval signals become an actionable worklist**, not just a dashboard (via H3 — stable,
+      prioritized proposals with exact targets/evidence and an explicit no-auto-apply contract).
 - [ ] **Multi-agent access uses a mechanical lock**, not discipline (via H4).
 - [ ] **Every operational loop has all five stages:** sensor + threshold + action + verification +
       rollback.

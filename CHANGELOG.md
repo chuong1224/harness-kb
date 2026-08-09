@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-08-09
+
+### Added
+- **H3 reference implementation: retrieval signals now become a reviewable worklist.**
+  `examples/scripts/worklist.py` consumes one already-measured insight snapshot and emits
+  deterministic proposals with a stable `H3-*` ID, priority, exact source/target, and the evidence
+  that triggered each action. It covers unseen or unindexed notes, repeated reads, long retrieval
+  routes, and high-margin scope-leakage candidates.
+- The safety boundary is machine-readable: every result is `proposal_only`, `auto_apply` is always
+  false, and every item requires review. The generator does not recompute sensors, guess a target
+  across areas, or edit/link/move/merge a note.
+- `examples/scripts/test_worklist.py` breaks the contract around thresholds, route grouping,
+  stable IDs, truncation, input immutability, and the CLI's write boundary.
+
+### Changed
+- Blueprint H3 now records the shipped design and acceptance criterion; README adds the artifact,
+  quickstart command, and the distinction between a proposal generator and an auto-fixer.
+
 ## [1.10.0] - 2026-08-05
 
 ### Added
