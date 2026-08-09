@@ -32,6 +32,77 @@ DEFAULT_RULES = {
 }
 
 WIKILINK = re.compile(r"(!?)\[\[([^\]]+)\]\]")
+FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+
+
+def strip_markdown_code(text):
+    """Mask fenced and inline code while preserving line breaks and offsets.
+
+    Syntax examples are not knowledge-graph edges. Supporting multi-backtick inline
+    delimiters and both CommonMark fence characters prevents the verifier from
+    reporting links shown in documentation as real broken links.
+    """
+    out = []
+    fence_char = None
+    fence_len = 0
+
+    for raw in text.splitlines(keepends=True):
+        body = raw.rstrip("\r\n")
+        ending = raw[len(body):]
+
+        if fence_char is not None:
+            stripped = body.lstrip(" ")
+            indent = len(body) - len(stripped)
+            run = len(stripped) - len(stripped.lstrip(fence_char))
+            closes = indent <= 3 and run >= fence_len \
+                and not stripped[run:].strip(" \t")
+            out.append(" " * len(body) + ending)
+            if closes:
+                fence_char = None
+                fence_len = 0
+            continue
+
+        fm = FENCE_OPEN_RE.match(body)
+        if fm:
+            fence = fm.group(1)
+            info = fm.group(2)
+            if fence[0] == "~" or "`" not in info:
+                fence_char = fence[0]
+                fence_len = len(fence)
+                out.append(" " * len(body) + ending)
+                continue
+
+        chars = list(body)
+        i = 0
+        while i < len(body):
+            if body[i] != "`":
+                i += 1
+                continue
+            run_end = i + 1
+            while run_end < len(body) and body[run_end] == "`":
+                run_end += 1
+            width = run_end - i
+            j = run_end
+            close_end = None
+            while j < len(body):
+                j = body.find("`", j)
+                if j < 0:
+                    break
+                end = j + 1
+                while end < len(body) and body[end] == "`":
+                    end += 1
+                if end - j == width:
+                    close_end = end
+                    break
+                j = end
+            if close_end is None:
+                i = run_end
+                continue
+            chars[i:close_end] = " " * (close_end - i)
+            i = close_end
+        out.append("".join(chars) + ending)
+
+    return "".join(out)
 
 
 def strip_scalar(v):
@@ -153,6 +224,7 @@ def main():
     def headings_of(path):
         if path not in heading_cache:
             _, b = parse_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
+            b = strip_markdown_code(b)
             heading_cache[path] = {
                 re.sub(r"^#+\s+", "", ln).strip().lower()
                 for ln in b.splitlines() if re.match(r"^#{1,6}\s", ln)
@@ -163,6 +235,7 @@ def main():
         rel = str(note.relative_to(vault)).replace("\\", "/")
         text = note.read_text(encoding="utf-8", errors="replace")
         meta, body = parse_frontmatter(text)
+        structure_body = strip_markdown_code(body)
         gate_ignore = str(meta.get("gate_ignore", "")).lower() == "true"
         tags = meta.get("tags", [])
         if isinstance(tags, str):
@@ -170,7 +243,7 @@ def main():
         is_index = ("index" in tags) or str(meta.get("type", "")).lower() == "index" or note.stem.lower().startswith("index")
 
         # --- wikilinks & image embeds ---
-        for embed, target in WIKILINK.findall(text):
+        for embed, target in WIKILINK.findall(structure_body):
             dest = resolve(target, note)
             clean = target.split("#", 1)[0].split("|", 1)[0].strip()
             anchor = target.split("#", 1)[1].split("|", 1)[0].strip() if "#" in target else ""
@@ -200,7 +273,7 @@ def main():
         title = meta.get("title")
         if title and title != note.stem:
             problems.append(("WARN", rel, f"title != filename ('{title}' vs '{note.stem}')"))
-        h1 = first_h1(body)
+        h1 = first_h1(structure_body)
         if title and h1 and h1 != title:
             problems.append(("WARN", rel, f"H1 != title ('{h1}' vs '{title}')"))
 

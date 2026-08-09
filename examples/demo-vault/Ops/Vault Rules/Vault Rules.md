@@ -32,3 +32,16 @@ Counted from the filesystem, not from memory: one index per folder that holds tw
 notes, named `Index - <Folder Name>`.
 
 Back to [[Index - Ops]].
+
+## Syntax examples used by the gate tests
+
+An inline example such as `[[Missing Inline Example]]` is documentation, not a graph edge.
+
+````markdown
+[[Missing Fenced Example]]
+![[missing-fenced-example.png]]
+```
+````
+
+The deliberately unresolved targets above stay inside code. If `verify_kb.py` starts scanning
+code as prose again, the clean demo-vault gate turns red.

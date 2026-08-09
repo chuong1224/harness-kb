@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 2026-08-09
+
+### Fixed
+- The integrity gate now ignores wikilinks, embeds, and headings shown inside inline code or
+  fenced code blocks. Documentation examples no longer become false broken-link reports or hide
+  genuinely orphaned media. A hostile fixture in the clean demo vault covers single- and
+  multi-backtick inline spans plus a four-backtick fence containing a shorter fence; prose after
+  the fence is still scanned normally.
+
 ## [1.11.0] - 2026-08-09
 
 ### Added
