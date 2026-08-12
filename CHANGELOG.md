@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.2] - 2026-08-12
+
+### Added
+- `CLAUDE.md` at the repo root — repo-local working notes for coding agents: which gates to run
+  before committing, why an exit code must be read without a pipe, the rule that every script
+  ships with the test that tries to break it, and the release rules (badge equals the newest
+  changelog entry, annotated tags, published tags never amended). A session opened directly in a
+  clone of this repository previously loaded no working rules at all.
+
+  Scoped to this repository on purpose. It is **not** a copy of the maintainer's vault rules, so
+  it cannot drift into a second source of truth for them and cannot point an agent at tooling
+  that does not exist here. It also ships **no** agent hooks or `.claude/` configuration: a
+  reference repository should not hand out settings that run commands on a cloner's machine.
+
 ## [1.11.1] - 2026-08-09
 
 ### Fixed
