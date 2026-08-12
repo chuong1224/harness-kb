@@ -29,6 +29,7 @@ python examples/scripts/test_routine_guard.py
 python examples/scripts/test_tooling_selfcheck.py
 python examples/scripts/test_auto_fix.py
 python examples/scripts/test_worklist.py
+python examples/scripts/test_audit_gate.py
 ```
 
 Both gates must exit `0` against `examples/demo-vault`: zero errors from the integrity gate,

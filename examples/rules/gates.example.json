@@ -1,0 +1,46 @@
+{
+  "_doc": [
+    "Gate config for examples/scripts/audit_gate.py. Copy to your vault root as",
+    "gates.json (or pass --config) and describe YOUR checkers. This is a template, not a",
+    "drop-in: the commands below point at this repo's example tools.",
+    "",
+    "name   used inside finding keys. Keep it stable - renaming a gate makes every one of",
+    "       its findings look brand new, and the gate will block on all of them at once.",
+    "cmd    argv list. {python} is the running interpreter, {vault} the vault root. A",
+    "       relative path resolves against the folder holding THIS config file.",
+    "parse  how output becomes finding keys:",
+    "         json:<field>         stdout is JSON; take the list at <field>",
+    "         json:checks[].list   flatten the named lists out of a list of check objects",
+    "         lines:<regex>        each matching stdout/stderr line (group 1 if present)",
+    "         exit                 pass/fail only",
+    "       Keys must be stable between runs. Anything volatile - a timestamp, a duration,",
+    "       a run id - makes an old finding look new forever, and a gate that cries wolf",
+    "       every turn is a gate somebody switches off.",
+    "paths  glob patterns; the gate runs only when a matching file changed. Use it to keep",
+    "       a slow suite off the critical path. Omit it (or use **) to always run.",
+    "cwd    optional working directory; defaults to the folder holding this config."
+  ],
+
+  "gates": [
+    {
+      "name": "integrity",
+      "cmd": ["{python}", "../scripts/verify_kb.py", "{vault}",
+              "--rules", "rules.example.json"],
+      "parse": "lines:^\\s*\\[ERR\\s*\\]\\s+(.+)$",
+      "paths": ["**"]
+    },
+    {
+      "name": "rules-drift",
+      "cmd": ["{python}", "../scripts/check_rules_drift.py", "{vault}",
+              "--rules", "rules.example.json", "--json"],
+      "parse": "json:errors",
+      "paths": ["**"]
+    },
+    {
+      "name": "tooling-tests",
+      "cmd": ["{python}", "../scripts/tooling_selfcheck.py", "run", "--vault", "{vault}"],
+      "parse": "lines:^FAIL\\s+(\\S+)",
+      "paths": ["**/*.py"]
+    }
+  ]
+}

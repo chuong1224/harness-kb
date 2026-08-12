@@ -4,6 +4,41 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-08-12
+
+### Added
+- **H4c reference implementation: "finish with a clean audit" becomes a rule the runtime enforces.**
+  `examples/scripts/audit_gate.py` runs every checker you declare and, from a `Stop` hook, refuses
+  to end the turn while something is broken. Gates are declared in JSON
+  (`examples/rules/gates.example.json`), not hardcoded: each entry names a command, a parser that
+  turns its output into stable finding keys (`json:<field>`, `json:checks[].list`, `lines:<regex>`,
+  `exit`), and optional `paths` globs so a slow suite stays off the critical path until its files
+  change. A gate that exits non-zero but yields no parsed key still produces one finding, so a
+  checker whose output format drifts can never be silently downgraded to "clean".
+
+  **The design problem this solves is not blocking — it is not blocking too much.** A guard that
+  jails a session over a red lamp somebody else lit is switched off within the week. So the gate
+  compares the *set of findings* against a stored baseline and blocks only on findings that are
+  new. Inherited findings are printed on every run but never block, and one that genuinely is not
+  yours is adopted with `accept --why "…"` — a recorded reason, not a disabled guard. Three
+  guarantees keep a session out of jail: `stop_hook_active` means it blocks at most once per turn,
+  every ambiguous case fails open (no vault, unreadable payload, missing command, unexpected
+  exception), and `AUDIT_GATE_OFF=1` stops it outright.
+
+  The quiet path is a vault fingerprint, so a turn that changed nothing starts no subprocess. The
+  baseline lives per machine, outside the vault, for the same reason the other state files do: a
+  cloud-synced folder turns a shared state file into a conflict-copy generator.
+
+- `examples/scripts/test_audit_gate.py` — break-the-gate tests on a throwaway vault, aimed at the
+  ways the guard could be *harmful*: that inherited debt does not block, that blocking does not
+  write the baseline (which would grandfather the finding it just blocked on), that a failing gate
+  with unreadable output still counts as failing, that a mistyped `--vault` reports an error instead
+  of reporting "clean", and that the shipped default config actually runs this repo's own checkers.
+
+- `examples/demo-vault/.kb-root` — the demo vault now carries a root marker, so the tools that
+  refuse to run outside a vault root can be pointed at it. Without it the example gate config could
+  not run its third gate against the fixture it ships with.
+
 ## [1.11.2] - 2026-08-12
 
 ### Added

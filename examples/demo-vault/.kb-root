@@ -1,0 +1,7 @@
+Marks this folder as a vault root.
+
+The scripts in examples/scripts locate a vault by walking up until they find `.obsidian`
+or this file, and refuse to run when they find neither - a tool pointed at the wrong
+folder finds nothing wrong and reports "clean", which is the most dangerous answer a
+checker can give. Obsidian users already have `.obsidian`; everyone else drops this file
+at the root instead.

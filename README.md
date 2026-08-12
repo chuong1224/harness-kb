@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.11.2-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.12.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
 
@@ -95,6 +95,9 @@ harness-kb/
 │   ├── scripts/test_tooling_selfcheck.py  Break-the-gate tests for that runner
 │   ├── scripts/routine_guard.py  Orders scheduled routines by mechanism, not by cron spacing (H4b)
 │   ├── scripts/test_routine_guard.py  Break-the-wait tests for that guard
+│   ├── scripts/audit_gate.py     Refuses to end a turn while an audit is unclean (H4c)
+│   ├── scripts/test_audit_gate.py  Break-the-gate tests, including "does it block too much?"
+│   ├── rules/gates.example.json  Which checkers the audit gate runs, and how to read them
 │   ├── hooks/settings.json       Example hooks: activity log, claim lock, tooling gate
 │   ├── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
 │   └── routines/kb-autofix-daily.SKILL.md  Template for the auto-fix run that follows it
@@ -177,6 +180,10 @@ python examples/scripts/routine_guard.py wait-report --report "/path/to/Audit Re
 
 # 8. Turn one retrieval-health snapshot into a stable, review-only worklist (H3)
 python examples/scripts/worklist.py insight.json --out worklist.json
+
+# 9. Run every gate you own and report only what is NEW since the last clean run (H4c)
+python examples/scripts/audit_gate.py run --vault /path/to/your/vault \
+       --config examples/rules/gates.example.json
 ```
 
 > **Put these scripts inside the vault they serve.** A machine with the notes but without the tools
@@ -188,6 +195,14 @@ being advice: a write to a file another stream is editing is **blocked**, not me
 It claims free files silently, so a single agent never notices it. Wire `tooling_selfcheck.py` into
 the `Stop` hook and the same becomes true of your tests: edit a tool, and its suite runs before the
 turn is allowed to end — because a gate nobody runs is not a gate.
+
+`audit_gate.py` finishes that thought for *every* checker you own. Wired into the `Stop` hook, it
+runs them and refuses to let the turn end while something is broken. The hard part is not blocking —
+it is **not blocking too much**. A guard that jails a session over a red lamp somebody else lit gets
+switched off within the week, so this one compares the *set of findings* against a stored baseline
+and blocks only on what is new. Inherited findings are printed on every run but never block, and a
+finding that genuinely is not yours is adopted with a recorded reason — `accept --why "…"` — rather
+than by disabling the guard.
 
 `auto_fix.py` is the only script here that writes to your notes, and it is deliberately the
 narrowest one: it rewrites a **number on a line that carries a marker**, nothing else. It refuses
