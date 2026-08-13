@@ -30,6 +30,7 @@ python examples/scripts/test_tooling_selfcheck.py
 python examples/scripts/test_auto_fix.py
 python examples/scripts/test_worklist.py
 python examples/scripts/test_audit_gate.py
+python examples/scripts/test_release_metadata.py
 ```
 
 Both gates must exit `0` against `examples/demo-vault`: zero errors from the integrity gate,
@@ -53,6 +54,8 @@ suite is incomplete work — a gate nobody can break is a gate nobody has tested
 - **SemVer.** The version badge at the top of `README.md` must equal the newest entry in
   `CHANGELOG.md`. They move in the same commit, never apart.
 - `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+- Every `## [X.Y.Z]` changelog entry has one canonical release-link definition at the footer;
+  `test_release_metadata.py` enforces this together with the README badge.
 - Tag each release `vX.Y.Z` as an **annotated** tag.
 - **Published tags are never amended or force-pushed.** A mistake ships as a new PATCH.
 - Commit messages and documentation in English. The README carries a Vietnamese section;
