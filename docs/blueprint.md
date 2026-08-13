@@ -268,6 +268,36 @@ mistyped path found no suites, reported green, and wrote a green marker — afte
 silent forever. **The dangerous failure mode of a gate is not a false alarm, it is quiet
 reassurance.** Test for that case explicitly.
 
+### Parse the format with a real parser, or your gate will lie about it
+
+The same "quiet reassurance" failure has a second, sneakier source: a gate that *approximates* the
+format it checks. Note metadata is YAML, and a regex reader for YAML is very easy to write and
+almost right — which is the problem. Given
+
+```yaml
+summary: "patched the "blank page" icon today"
+```
+
+a hand-rolled parser cheerfully returns a string. A real YAML parser raises, and so does the editor:
+the note has **no title, no tags, no summary** for anything reading it properly. The gate compares
+its own lenient reading against its own lenient reading, finds no contradiction, and prints green.
+In the system this blueprint comes from, two notes sat broken that way for days behind a gate that
+had never once complained — and the daily audit, which read frontmatter the same approximate way,
+agreed with it every single morning. **Two checkers sharing one wrong assumption do not
+cross-check each other; they corroborate.**
+
+The fix is not a better regex. It is to let the authoritative parser render the verdict on validity,
+and keep the lenient reader only for the fields you extract afterwards. `verify_kb.py` does exactly
+that, and treats a broken note as *one* finding rather than cascading into "missing title, missing
+tags, missing summary" — derived noise buries its own cause.
+
+That decision has a price worth paying deliberately: it is the one dependency in this repo. Which
+raises the last question — what should a gate do when a checker it needs is not installed? Not
+skip it and print green. `verify_kb.py` names the missing checker and exits `2`, distinct from both
+`0` (clean) and `1` (problems). **"Nothing found" and "could not look" must never share an exit
+code.** A gate that cannot be honest about its own blind spots has no standing to certify anything
+else.
+
 ### A test that breaks a real document must be able to put it back — or shout
 
 Contract-breaking tests are the ones worth having: they corrupt a number, run the checker, and demand

@@ -4,6 +4,39 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-08-13
+
+### Added
+- **The integrity gate now validates frontmatter with a real YAML parser, and admits when it
+  cannot.** `verify_kb.py` previously read note metadata only through its own lenient regex
+  parser, which returns a plausible string for `summary: "the "blank page" icon"` — while
+  Obsidian and every spec-compliant reader see a note with no title, no tags and no summary.
+  The gate compared its own lenient reading against itself, found no contradiction, and
+  printed green; in the system this repo is distilled from, two notes stayed broken that way
+  for days, with the daily audit agreeing every morning because it made the same assumption.
+  Validity is now decided by `yaml.safe_load` and reported as `file, line, column` so it can
+  be jumped to. A note whose YAML is broken yields exactly one finding: the derived
+  frontmatter checks are suppressed for it, because they read metadata that is fiction.
+- `examples/scripts/test_verify_kb.py` — the break-the-gate suite this script never had. 13
+  cases covering the nested-quote finding, the mirror-image valid form that must stay silent,
+  tabs, non-mapping frontmatter, notes without frontmatter, a leading horizontal rule,
+  `gate_ignore`, and the missing-dependency path. Verified by mutation: with the new check
+  removed, 8 of the 13 fail and the broken fixture reports `clean - 0 problems`.
+
+### Changed
+- **`verify_kb.py` exit codes now distinguish "nothing found" from "could not look".** `2` means
+  the run cannot certify anything — bad arguments, or a required checker unavailable. When
+  PyYAML is missing the gate names it, points at `pip install pyyaml`, and exits `2` instead of
+  skipping the check and printing a green line. A gate that cannot be honest about its own
+  blind spots has no standing to certify anything else.
+- **Dependency policy: standard library, plus exactly one documented exception.** PyYAML is now
+  required by `verify_kb.py` alone; every other script remains stdlib-only. The README badge,
+  the README quickstart, and `CLAUDE.md` state the exception and the rule attached to it — a
+  missing dependency may never degrade quietly into a pass.
+- `docs/blueprint.md` gains "Parse the format with a real parser, or your gate will lie about
+  it", covering the shared-wrong-assumption failure: two checkers agreeing does not mean two
+  independent measurements.
+
 ## [1.12.1] - 2026-08-13
 
 ### Fixed
@@ -491,6 +524,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.13.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.13.0
 [1.12.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.12.1
 [1.12.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.12.0
 [1.11.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.11.2

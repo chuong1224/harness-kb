@@ -6,10 +6,25 @@ This is the "verify" step of the control loop described in docs/blueprint.md.
 It scans a folder of Markdown notes (a "vault") and reports violations of the
 rules defined in a single source-of-truth file (see examples/rules/rules.example.json).
 
-Exit code 0 = clean, 1 = problems found. Wire it into a commit hook or a scheduled
-audit as a hard gate: no green, no "done".
+Exit code 0 = clean, 1 = problems found, 2 = cannot certify. Wire it into a commit
+hook or a scheduled audit as a hard gate: no green, no "done".
 
-Zero dependencies: Python 3.8+, standard library only.
+Dependencies: Python 3.8+ standard library, plus PyYAML for one check.
+
+Why the exception is worth it. Every other check here reads frontmatter with the
+lenient hand-rolled parser below, and that parser is a liar by construction: given
+`summary: "patched the "blank page" icon"` it happily returns a string, while a real
+YAML parser raises. The note is broken - Obsidian and any spec-compliant reader see
+no title, no tags, no summary - and a gate built only on regex reports it clean. That
+is not a hypothetical; it hid two broken notes for days in the vault this repo is
+distilled from. So the validity verdict belongs to a real parser, not to us.
+
+If PyYAML is missing the script does not silently skip that check and print a green
+line. It reports the checker as unavailable and exits 2. "Zero problems found" while
+a mandatory checker is absent is not clean, it is unknown, and a gate that cannot tell
+the two apart is the thing this whole repo argues against.
+
+    pip install pyyaml
 
 Usage:
     python verify_kb.py /path/to/vault --rules rules.example.json
@@ -20,6 +35,14 @@ import json
 import re
 import sys
 from pathlib import Path
+
+try:
+    import yaml as _yaml
+    YAML_SAFE_LOAD = _yaml.safe_load
+    YAML_IMPORT_ERROR = ""
+except Exception as _exc:                    # noqa: BLE001 - the one optional dependency
+    YAML_SAFE_LOAD = None
+    YAML_IMPORT_ERROR = "%s: %s" % (type(_exc).__name__, _exc)
 
 DEFAULT_RULES = {
     "tags": {"controlled_vocabulary": [], "index_only_tag": "index"},
@@ -33,6 +56,7 @@ DEFAULT_RULES = {
 
 WIKILINK = re.compile(r"(!?)\[\[([^\]]+)\]\]")
 FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+FRONTMATTER_RE = re.compile(r"\A﻿?---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
 
 
 def strip_markdown_code(text):
@@ -146,6 +170,39 @@ def parse_frontmatter(text):
         else:
             meta[key] = strip_scalar(val)
     return meta, body
+
+
+def frontmatter_block(text):
+    """The raw YAML block between the leading `---` fences, or '' when absent.
+
+    Deliberately stricter than parse_frontmatter's scan: the fences must be whole
+    lines, so a horizontal rule at the top of a note is not mistaken for metadata.
+    """
+    m = FRONTMATTER_RE.match(text)
+    return m.group(1) if m else ""
+
+
+def yaml_frontmatter_error(text):
+    """None when the frontmatter parses as YAML; (line, column, reason) when it does not.
+
+    Reported line numbers are file lines: the block starts after the opening `---`,
+    hence the +2 offset, so the message points at something you can jump to.
+    """
+    block = frontmatter_block(text)
+    if not block:
+        return None
+    try:
+        parsed = YAML_SAFE_LOAD(block)
+    except Exception as exc:                 # noqa: BLE001 - a parser error is the finding
+        mark = getattr(exc, "problem_mark", None)
+        line = int(getattr(mark, "line", 0)) + 2
+        col = int(getattr(mark, "column", 0)) + 1
+        reason = str(getattr(exc, "problem", "") or str(exc)).splitlines()[0]
+        return line, col, reason
+    # Parses, but not into a mapping: every `meta["title"]` lookup downstream is a lie.
+    if parsed is not None and not isinstance(parsed, dict):
+        return 2, 1, "frontmatter must be a mapping of `key: value`, got %s" % type(parsed).__name__
+    return None
 
 
 def is_excluded(path: Path, vault: Path, rules):
@@ -264,6 +321,17 @@ def main():
         if gate_ignore:
             continue
 
+        # --- frontmatter is valid YAML at all (needs a real parser, not our regex) ---
+        if YAML_SAFE_LOAD is not None:
+            bad = yaml_frontmatter_error(text)
+            if bad:
+                line, col, reason = bad
+                problems.append(("ERR", rel, f"invalid YAML frontmatter at line {line}, column {col}: {reason}"))
+                # Everything below reads `meta`, which came from the lenient parser and
+                # is therefore fiction for this note. Reporting it would bury the one
+                # finding that matters under a pile of derived noise.
+                continue
+
         # --- frontmatter contract ---
         for field in required:
             if not meta.get(field):
@@ -304,6 +372,7 @@ def main():
 
     errors = [p for p in problems if p[0] == "ERR"]
     warns = [p for p in problems if p[0] == "WARN"]
+    degraded = YAML_SAFE_LOAD is None
 
     print(f"Vault: {vault}")
     print(f"Notes checked: {len(notes)} | files: {len(all_files)}")
@@ -312,6 +381,14 @@ def main():
         print(f"  [{sev}] {rel}: {msg}")
     if not problems:
         print("  clean - 0 problems")
+
+    if degraded:
+        detail = f" ({YAML_IMPORT_ERROR})" if YAML_IMPORT_ERROR else ""
+        print(f"\n  [OFF] YAML frontmatter validity: PyYAML not importable{detail}")
+        print("        Install it with `pip install pyyaml`.")
+        print("RESULT: DEGRADED - a required checker is missing, so this run cannot")
+        print("        certify the vault as clean. Counts above are incomplete.")
+        return 2
 
     return 1 if errors else 0
 

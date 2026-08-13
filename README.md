@@ -3,16 +3,17 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.12.1-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.13.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
-[![Dependencies](https://img.shields.io/badge/deps-zero-brightgreen.svg)](#)
+[![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
 > Most "second brains" rot. When an AI agent relies on your knowledge base, rot becomes
 > a correctness problem: stale indexes, contradictory rules, and broken links quietly make
 > the agent miss data. At scale, you cannot hand-maintain your way out of this.
 >
-> **Harness KB** is a small, dependency-free blueprint — plus reference artifacts — for a KB
-> that keeps *itself* correct, fresh, and fast to retrieve. It is the architecture, not an app.
+> **Harness KB** is a small blueprint — plus reference artifacts — for a KB that keeps
+> *itself* correct, fresh, and fast to retrieve. It is the architecture, not an app.
+> Everything runs on the Python standard library, with [one deliberate exception](#dependencies).
 
 _Provenance: this blueprint reflects a real working system as of **2026-07-25**. The concepts are
 evergreen; any specific counts are illustrative snapshots, not live values._
@@ -81,7 +82,8 @@ harness-kb/
 │   └── blueprint.md              The architecture: scorecard, loop diagnosis, roadmap, safety
 ├── examples/
 │   ├── rules/rules.example.json  Single source of truth for tags/areas (the H1 pattern)
-│   ├── scripts/verify_kb.py      Integrity gate — the "verify" step of the loop (zero deps)
+│   ├── scripts/verify_kb.py      Integrity gate — the "verify" step of the loop
+│   ├── scripts/test_verify_kb.py Break-the-gate tests, incl. the frontmatter-validity case
 │   ├── scripts/check_rules_drift.py  Documents vs. the source of truth — kills rule drift (H1)
 │   ├── scripts/test_drift_check.py   Break-the-gate tests for the drift checker
 │   ├── scripts/auto_fix.py       Fixes the one safe class of drift — backup, gate, rollback (H2)
@@ -148,9 +150,38 @@ Everything above is read-only except `auto_fix.py`, which is the only script her
 to your notes — and it is deliberately the narrowest one. `worklist.py` is the decision boundary:
 it turns measurements into exact proposals but still leaves every semantic change to a reviewer.
 
+## Dependencies
+
+Python 3.8+. Every script here runs on the standard library alone, with **one exception**:
+
+```bash
+pip install pyyaml      # needed by verify_kb.py only
+```
+
+`verify_kb.py` uses PyYAML to answer one question its own parser must not be trusted with:
+*is this note's frontmatter valid YAML at all?* Given `summary: "the "blank page" icon"` a
+hand-rolled parser returns a perfectly plausible string, while Obsidian and every
+spec-compliant reader see a note with **no title, no tags, no summary**. A gate that reads
+frontmatter with a regex calls that note clean — and in the vault this blueprint is distilled
+from, exactly that happened: two broken notes sat behind a green gate for days.
+
+So the verdict goes to a real parser. And when PyYAML is missing, `verify_kb.py` does not
+quietly skip the check and print a green line — it names the missing checker and **exits 2**:
+
+| Exit | Meaning |
+|---|---|
+| `0` | clean |
+| `1` | problems found |
+| `2` | cannot certify — bad arguments, or a required checker is unavailable |
+
+"Zero problems found" while a mandatory check did not run is not a clean result, it is an
+unknown one. Collapsing those two into the same green light is the failure this repo argues
+against, so the gate refuses to do it — even about itself.
+
 ## Quickstart
 
-The scripts run on any folder of Markdown notes (a "vault"). Python 3.8+, no packages required.
+The scripts run on any folder of Markdown notes (a "vault"). Python 3.8+; see
+[Dependencies](#dependencies) for the single optional package.
 
 ```bash
 # 1. Check integrity — the verify gate of the control loop

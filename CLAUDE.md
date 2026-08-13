@@ -11,9 +11,22 @@ scripts under `examples/scripts/` are meant to be **copied into the vault they s
 run from a checkout of this repo — a machine holding the notes but not the tools cannot
 verify or regenerate anything.
 
-**Zero dependencies, standard library only.** Every script must run under a plain
-`python script.py` on a clean machine. Do not add a package, a framework, or a config
-format that needs one.
+**Standard library only, with exactly one documented exception.** Every script must run
+under a plain `python script.py` on a clean machine. Do not add a package, a framework,
+or a config format that needs one.
+
+The single exception is **PyYAML**, used by `verify_kb.py` to decide whether a note's
+frontmatter is valid YAML at all. It is a deliberate trade, not an oversight: that verdict
+cannot be delegated to a hand-rolled parser, because a hand-rolled parser is precisely what
+returns a plausible answer for `summary: "the "blank page" icon"` while Obsidian and every
+spec-compliant reader see a note with no title, no tags and no summary. A gate that cannot
+detect this reports the note as clean, which is the failure mode this entire repo exists to
+argue against.
+
+The exception comes with a rule: when PyYAML is absent, `verify_kb.py` **exits 2 and refuses
+to certify anything** — it never prints a green line for a check it could not run. Extending
+the exception to another script, or letting a missing dependency degrade quietly into a pass,
+both need an explicit decision recorded in the changelog.
 
 ## Before you commit
 
@@ -23,6 +36,7 @@ python examples/scripts/verify_kb.py examples/demo-vault --rules examples/rules/
 python examples/scripts/check_rules_drift.py examples/demo-vault --rules examples/rules/rules.example.json
 
 # the break-the-gate suites that guard the tooling itself
+python examples/scripts/test_verify_kb.py
 python examples/scripts/test_drift_check.py
 python examples/scripts/test_claim.py
 python examples/scripts/test_routine_guard.py
