@@ -26,9 +26,11 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 SCRIPT = Path(__file__).resolve().parent / "tooling_selfcheck.py"
+TMP_PREFIX = "toolgate-test-"
 failures = 0
-vault = Path()
-state = Path()
+vault = None
+state = None
+temp_root = None
 
 TEST_OK = "import pathlib\n" \
           "p = pathlib.Path(__file__).with_name('runs.txt')\n" \
@@ -45,6 +47,30 @@ def report(name, ok, detail=""):
     print("[%s] %s" % ("PASS" if ok else "FAIL", name))
     if not ok and detail:
         print("---- output ----\n" + detail.strip() + "\n----------------")
+
+
+def own_temp(p):
+    """Accept only paths owned by this exact test run; every deletion goes through here."""
+    if p is None or temp_root is None:
+        return False
+    try:
+        candidate = Path(p).resolve()
+        owner = temp_root.resolve()
+        system_temp = Path(tempfile.gettempdir()).resolve()
+    except OSError:
+        return False
+    owner_is_safe = (
+        owner != system_temp
+        and system_temp in owner.parents
+        and owner.name.startswith(TMP_PREFIX)
+    )
+    return owner_is_safe and (candidate == owner or owner in candidate.parents)
+
+
+def wipe(p):
+    """Delete only directories owned by this test run; reject everything else."""
+    if own_temp(p):
+        shutil.rmtree(p, ignore_errors=True)
 
 
 def run(argv, stdin=None, env_extra=None):
@@ -85,12 +111,22 @@ def base(*extra):
 
 
 def main() -> int:
-    global vault, state
-    tmp = Path(tempfile.mkdtemp(prefix="toolgate-test-"))
+    global vault, state, temp_root
+    tmp = Path(tempfile.mkdtemp(prefix=TMP_PREFIX))
+    temp_root = tmp.resolve()
     vault = tmp / "demo vault"                    # a space in the path, on purpose
     (vault / ".obsidian").mkdir(parents=True)
     state = tmp / "cache" / "green-marker.json"
     try:
+        # Destructive-delete fuse: inspect paths only; never delete the unsafe examples.
+        report("S1. own_temp rejects the current directory",
+               not own_temp(Path()) and not own_temp(Path.cwd()))
+        report("S2. own_temp rejects the system temp root", not own_temp(tempfile.gettempdir()))
+        report("S3. own_temp accepts this run's root and descendants",
+               own_temp(tmp) and own_temp(vault) and own_temp(state.parent))
+        report("S4. own_temp rejects a same-prefix directory from another run",
+               not own_temp(Path(tempfile.gettempdir()) / "toolgate-test-not-this-run"))
+
         # --- discovery -------------------------------------------------------------
         write_test("test_ok.py", TEST_OK)
         att().joinpath("tool_x.py").write_text("# a tool with no test\n", encoding="utf-8")
@@ -168,7 +204,7 @@ def main() -> int:
                code == 1 and "FAIL test_slow.py" in out and "exceeded 2s" in out, out)
         att().joinpath("test_slow.py").unlink()
 
-        shutil.rmtree(att(), ignore_errors=True)
+        wipe(att())
         code, out = run(base("run"))
         report("19. a vault with no suites exits 0 and says so",
                code == 0 and "No suites found" in out, out)
@@ -177,7 +213,10 @@ def main() -> int:
         report("20. a --vault typo is rejected instead of reporting a false green",
                code == 2 and "not a vault root" in out, out)
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        wipe(tmp)
+        vault = None
+        state = None
+        temp_root = None
 
     print("\nRESULT: %s" % ("ALL PASS" if not failures else "%d FAILED" % failures))
     return 1 if failures else 0

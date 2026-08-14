@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 2026-08-14
+
+### Fixed
+- **The two suites that delete test directories now require proof that the target belongs to
+  the current run.** `test_claim.py` and `test_tooling_selfcheck.py` no longer initialize a
+  vault path as `Path()` (the current directory). Every recursive deletion goes through
+  `own_temp()` and `wipe()`, which accept only the exact `mkdtemp` root created by this process
+  or one of its descendants, under the system temp directory and with the suite's prefix.
+  This closes the same failure pattern that once turned an uninitialized test path into a
+  recursive deletion of the real working directory.
+- Each suite adds four break-the-fuse checks: reject the current directory, reject the system
+  temp root, accept this run's root and descendants, and reject a same-prefix directory owned
+  by another run. Mutation testing made `own_temp()` always return true; both suites exited 1
+  and all three rejection checks failed, proving the new cases depend on the fuse.
+
 ## [1.13.0] - 2026-08-13
 
 ### Added
@@ -524,6 +539,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.13.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.13.1
 [1.13.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.13.0
 [1.12.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.12.1
 [1.12.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.12.0

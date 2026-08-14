@@ -30,8 +30,10 @@ HERE = Path(__file__).resolve().parent
 SCRIPT = HERE / "claim.py"
 HOST = socket.gethostname().split(".")[0] or "unknown"
 STREAM_TTL, FILE_TTL = 3600, 600
+TMP_PREFIX = "claim-test-"
 failures = 0
-vault = Path()
+vault = None
+temp_root = None
 
 
 def report(name, ok, detail=""):
@@ -41,6 +43,30 @@ def report(name, ok, detail=""):
     print("[%s] %s" % ("PASS" if ok else "FAIL", name))
     if not ok and detail:
         print("---- output ----\n" + detail.strip() + "\n----------------")
+
+
+def own_temp(p):
+    """Accept only paths owned by this exact test run; every deletion goes through here."""
+    if p is None or temp_root is None:
+        return False
+    try:
+        candidate = Path(p).resolve()
+        owner = temp_root.resolve()
+        system_temp = Path(tempfile.gettempdir()).resolve()
+    except OSError:
+        return False
+    owner_is_safe = (
+        owner != system_temp
+        and system_temp in owner.parents
+        and owner.name.startswith(TMP_PREFIX)
+    )
+    return owner_is_safe and (candidate == owner or owner in candidate.parents)
+
+
+def wipe(p):
+    """Delete only directories owned by this test run; reject everything else."""
+    if own_temp(p):
+        shutil.rmtree(p, ignore_errors=True)
 
 
 def run(argv, stdin=None, env_extra=None):
@@ -102,12 +128,13 @@ def keys_of(stream):
 
 
 def reset():
-    shutil.rmtree(cdir(), ignore_errors=True)
+    wipe(cdir())
 
 
 def main() -> int:
-    global vault
-    tmp = Path(tempfile.mkdtemp(prefix="claim-test-"))
+    global vault, temp_root
+    tmp = Path(tempfile.mkdtemp(prefix=TMP_PREFIX))
+    temp_root = tmp.resolve()
     vault = tmp / "demo vault"                     # a space in the path, on purpose
     (vault / ".obsidian").mkdir(parents=True)
     (vault / "ops").mkdir()
@@ -115,6 +142,15 @@ def main() -> int:
     shared.write_text("# runbook", encoding="utf-8")
     (vault / "notes.md").write_text("# notes", encoding="utf-8")
     try:
+        # Destructive-delete fuse: inspect paths only; never delete the unsafe examples.
+        report("S1. own_temp rejects the current directory",
+               not own_temp(Path()) and not own_temp(Path.cwd()))
+        report("S2. own_temp rejects the system temp root", not own_temp(tempfile.gettempdir()))
+        report("S3. own_temp accepts this run's root and descendants",
+               own_temp(tmp) and own_temp(vault) and own_temp(cdir()))
+        report("S4. own_temp rejects a same-prefix directory from another run",
+               not own_temp(Path(tempfile.gettempdir()) / "claim-test-not-this-run"))
+
         code, out = run(["take", "ops/runbook.md", "--stream", "A", "--vault", str(vault),
                          "--why", "rewriting rollback"])
         report("1. claiming a free file succeeds", code == 0 and "CLAIMED" in out, out)
@@ -222,7 +258,9 @@ def main() -> int:
         report("25. in a close race the earlier claim wins and the loser withdraws",
                code == 1 and keys_of("A") == [], out + str(keys_of("A")))
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        wipe(tmp)
+        vault = None
+        temp_root = None
 
     print("\nRESULT: %s" % ("ALL PASS" if not failures else "%d FAILED" % failures))
     return 1 if failures else 0
