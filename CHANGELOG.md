@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-08-16
+
+### Added
+- **A fifth property for the end-of-turn gate: measure what the suite did, do not ask it.** The
+  section previously stopped at four, and all four are about *running* the suites. None of them
+  notices when a suite still runs but has stopped checking anything. A zero exit proves nothing was
+  raised, not that anything was verified — a suite that skips quietly (`if not condition: pass`), or
+  that loses assertions to a careless edit, still exits zero while the gate stamps another green run
+  over coverage that has evaporated. The property: have each suite print one line per assertion,
+  count those lines, compare against the last green run, and treat a drop as a fact rather than an
+  intent to be guessed. Deleting five cases and silently skipping five look identical from outside.
+  It also names the necessary exit — a way to lower the mark *with a stated reason*, because a gate
+  with no legitimate way out is a gate that gets switched off.
+- **The blind spot that measurement creates, stated as a general rule.** Counting assertions catches
+  a suite that *goes* quiet; it cannot see a suite that was never audible. Three of ours printed no
+  assertion line at all — they used a test framework whose own spelling the runner did not read — so
+  their count was zero, and zero cannot fall: an entire test class could be deleted from any of them
+  without moving a number. Hence the rule that generalizes past any one runner — **a gate built on
+  deltas must also refuse the value that has no delta** — and the reason it gets no acceptance path,
+  unlike a coverage drop: lowering a mark concedes that coverage fell for a reason, while silence
+  means the instrument never reached the suite at all.
+- **Two corollaries about the instrument itself.** Separate *the code is broken* from *the
+  measurement is broken*, so a suite that is red for a missing library is not reported as a coverage
+  problem and nobody is sent to edit healthy code. And make the instrument deterministic before
+  trusting its numbers: ours decoded child output as UTF-8 while the child wrote in the platform's
+  locale encoding, so one separator came back mangled, one counting pattern missed, and a suite
+  scored 10 or 1 depending on which shell had launched the runner. A suite that only passes on one
+  operator's machine has not been measured.
+
 ## [1.13.1] - 2026-08-14
 
 ### Fixed
@@ -539,6 +568,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.14.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.14.0
 [1.13.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.13.1
 [1.13.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.13.0
 [1.12.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.12.1

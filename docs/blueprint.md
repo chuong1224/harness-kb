@@ -249,7 +249,7 @@ later that the check you trusted has been vacuous for weeks.
 Wire the suites to something the runtime already does. An end-of-turn hook works well: it is
 frequent, it is automatic, and it is a natural place to refuse — *this turn is not finished while a
 tool you just edited has a failing test.* `examples/scripts/tooling_selfcheck.py` is that gate, and
-four properties are what make it survivable rather than merely strict:
+five properties are what make it survivable rather than merely strict:
 
 - **Discover the suite, never list it.** Anything matching `attachments/test_*.py` is in. A list you
   must remember to append to is the same failure mode one level up — and hand-maintained file lists
@@ -262,11 +262,38 @@ four properties are what make it survivable rather than merely strict:
 - **Fail open, and never trap.** Unknown input, no vault, runner crash → allow. Already blocked once
   this turn → report but let it end. A gate that can strand a session is a gate someone disables
   permanently, and then you have nothing.
+- **Measure what the suite did, do not ask it.** A zero exit proves nothing was raised; it does not
+  prove anything was checked. A suite that skips quietly — `if not condition: pass` — or that loses
+  assertions to a careless edit still exits zero, and the gate stamps another green run over coverage
+  that has evaporated. Have every suite print one line per assertion, count those lines, and compare
+  the count against the last green run. A drop is an observable fact, so you never have to infer
+  intent: deleting five cases and silently skipping five look identical from the outside. Leave an
+  explicit way to lower the mark *with a stated reason* — a gate with no legitimate exit is a gate
+  that gets switched off.
 
 The bug that made all this concrete: an early version accepted `--vault` without validating it. A
 mistyped path found no suites, reported green, and wrote a green marker — after which the gate stayed
 silent forever. **The dangerous failure mode of a gate is not a false alarm, it is quiet
 reassurance.** Test for that case explicitly.
+
+And expect that lesson to come back one level up, because each gate you add creates a new quiet
+channel above itself. Counting assertions catches a suite that *goes* quiet; it cannot see a suite
+that was never audible. Three of ours printed no assertion line at all — they used a test framework
+whose own spelling the runner did not read — so their count was zero, and zero cannot fall. An entire
+test class could be deleted from any of them without moving a single number. The rule that follows
+generalizes past this one runner: **a gate built on deltas must also refuse the value that has no
+delta.** A suite that runs green and says nothing is an error, not a footnote. Give it no acceptance
+path either — lowering a mark concedes that coverage fell for a reason, while silence means the
+instrument never reached that suite at all, and "accepting" that is agreeing to let it drift forever.
+
+Two corollaries worth paying for once rather than twice. Distinguish *the code is broken* from *the
+measurement is broken*: a suite that is red because the interpreter lacks a library, or one that
+prints nothing because it died on line one, must not be reported as a coverage problem — send people
+to the right repair, or they will go and edit healthy code. And make the instrument itself
+deterministic before you trust its numbers: ours decoded child output as UTF-8 while the child wrote
+in the platform's locale encoding, so one separator character came back mangled, one counting pattern
+missed, and a suite scored 10 or 1 depending on which shell had launched the runner. The suite that
+only passes on one operator's machine has not been measured.
 
 ### Parse the format with a real parser, or your gate will lie about it
 
