@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.15.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.16.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
@@ -201,6 +201,11 @@ python examples/scripts/claim.py status --vault /path/to/your/vault
 
 # 5. Run the test suites that guard your own in-vault tooling
 python examples/scripts/tooling_selfcheck.py run --vault /path/to/your/vault
+
+# 5b. It also counts each suite's assertions and blocks when that number falls. When the
+#     drop is deliberate, lower the mark on the record instead of switching the gate off:
+python examples/scripts/tooling_selfcheck.py accept --reason "merged two redundant cases" \
+    --vault /path/to/your/vault
 
 # 6. Let the machine fix the one class of drift it cannot get wrong (dry run first)
 python examples/scripts/auto_fix.py /path/to/your/vault --rules examples/rules/rules.example.json

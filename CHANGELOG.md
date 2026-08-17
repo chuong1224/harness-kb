@@ -4,6 +4,53 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-08-18
+
+### Added
+- **The example gate now does the five things the blueprint says it does.** The gate
+  section has grown for several releases while `examples/scripts/tooling_selfcheck.py`
+  stayed at the four original properties, so the prose claimed a fifth — "measure what the
+  suite did, do not ask it" — that a reader running the script would not find anywhere in
+  it. Documentation that describes a mechanism the shipped code does not implement is the
+  exact drift this repo argues against, and it had taken root here. The example now
+  implements what it is documented as doing: it counts one line per assertion out of each
+  suite's output, stores those counts in the green marker, and blocks when a later run
+  measures less — with `accept --reason "..."` as the only way down, so a mark can be
+  lowered but not lowered quietly.
+- **A refusal for the value that has no delta.** A suite that runs green while printing no
+  assertion at all is now rejected rather than counted. Its number is 0, and 0 cannot fall,
+  so the coverage comparison alone would let an entire test class be deleted out of it
+  without moving anything. This one deliberately has no acceptance path: lowering a mark
+  concedes coverage fell for a reason, while silence means the instrument never reached
+  that suite.
+- **Two verdicts that separate broken code from broken measurement**, each blocking exactly
+  as hard as a red suite and recording no green mark. `MISSING-LIB` when the interpreter
+  running the tests lacks a library — the message names that interpreter and the install
+  command for it, because the tests run under whichever `python` invoked the gate, not the
+  one a reader assumes. `LOCKED-FILE` when a document a suite reads is held open by a
+  desktop application. Both are **re-derived at classification time** rather than pattern-
+  matched out of the error text: the lock verdict re-opens the file, and if it opens now
+  the failure stays a plain failure. A fixture can print any string it likes, and the same
+  exception arrives from causes a label does not cover — so the trigger is also kept narrow
+  enough that an ordinary permission error is never dressed up as "close your spreadsheet".
+- **The Stop hook names the cause.** Reporting "a suite is red" at a held-open document, or
+  at coverage that quietly fell, is how people end up editing code that was never broken.
+- The break-the-gate suite grew from 24 assertions to 53, covering each of the above plus
+  the three ways the new labels could be claimed by the wrong failure.
+
+### Fixed
+- **A roll-up line was counted as one assertion on Windows.** The pattern that reads
+  `PASS 7/7` from suites using bare asserts ended in an end-of-line branch that a CRLF
+  stream never reaches — the `\r` sits between the digits and the line end. Such a suite
+  measured 1 instead of 7 forever, which is the same blind spot the mute check exists to
+  close: deleting six scenarios would not have moved the number. Only suites that happen to
+  print a `·` separator were matching, so this held together on spelling rather than design.
+- **The instrument no longer drifts with the shell.** Child processes now run with
+  `PYTHONIOENCODING=utf-8`; previously a suite's output was decoded as UTF-8 while the
+  child wrote in the platform's locale encoding, so a separator came back mangled, the
+  counting pattern missed it, and the same suite scored differently depending on which
+  shell launched the runner. A number that changes with the operator is not a measurement.
+
 ## [1.15.0] - 2026-08-18
 
 ### Added
@@ -602,6 +649,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.16.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.16.0
 [1.15.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.15.0
 [1.14.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.14.1
 [1.14.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.14.0
