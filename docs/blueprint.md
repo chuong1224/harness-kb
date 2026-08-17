@@ -345,6 +345,57 @@ skip it and print green. `verify_kb.py` names the missing checker and exits `2`,
 code.** A gate that cannot be honest about its own blind spots has no standing to certify anything
 else.
 
+### Point a gate at its own source of truth, not only at the world it describes
+
+Handing the verdict to the real parser closes the "almost right regex" hole. It does not close the
+one behind it, because **real parsers are lenient by specification**, and every gate you have may be
+pointed somewhere else entirely.
+
+Our work registry is one JSON file, and its gate compared that file against the vault in both
+directions: an open item with no anchor in a note is an error, an anchor with no item is an error,
+duplicate codes are an error. Careful, two-way, and green for months. None of those checks ever
+looked at the file itself. Two failures walked through the gap:
+
+- **An item carried the same key twice.** `json.loads` keeps the last occurrence and says nothing —
+  that is the specification, not a bug. The document is valid, the parse succeeds, the reader sees
+  one key. Ours was a duplicate on a harmless field. Had it landed on a status or a completion date,
+  the parser would have discarded real data at load time and every downstream reader, gate included,
+  would have agreed on the survivor.
+- **The file was silently reformatted** to a different indent. Harmless in isolation, except the
+  writer had been taught (correctly) to preserve whatever formatting it finds, so one bad write
+  locks the new shape in permanently and the next commit carries a whole-file diff over everyone
+  else's work — the exact outcome the preserve-the-format rule existed to prevent, entered from the
+  other side.
+
+Three consequences worth carrying into any harness:
+
+**Check the shape of your source of truth, in the same gate.** Duplicate keys at every nesting
+level, the formatting contract, and the internal consistency the schema cannot express — a record
+marked finished with no completion date, a completion date preceding its creation date. Ours lost
+that field on two items for eight days with every gate green, because "finished without a finish
+date" had never been posed as a question.
+
+**Do not store the contract inside the artifact it governs.** Making the format policy a field of
+the registry is the tidy-looking choice and the wrong one: a single bad write can flip the file and
+the rule that judges it in the same stroke, and the gate reports green. Policy about an artifact
+belongs one level up from it.
+
+**This class of bug erases its own evidence, so the check has to sit ahead of the next write.** By
+the time we went looking, the duplicate key was gone — a later routine write had rewritten the file
+from the parsed object, which by definition has one key. The reformat had been normalised by another
+session. Neither ever reached a commit: across the entire history of that file, no revision carries
+either symptom. They lived only in a working tree, between two writes. A detector you run after the
+fact would have found nothing and pronounced the system clean, twice.
+
+Which leaves the question of what caught it, since no gate did. An acceptance rule did: *the byte
+delta of an edit must equal the bytes you meant to add*. Adding 40 bytes to a file that grew by 60
+is arithmetic, and it does not care what the failure was — it caught a stray duplicated line the
+same way it had earlier caught line endings being rewritten across an entire file. **Gates catch the
+failure classes someone already imagined. Keep at least one acceptance check that is a plain
+identity over the artifact, because that is the only kind that can catch the classes nobody has
+imagined yet** — and when it fires, the fix is not just to repair the file, it is to ask which gate
+should have seen this and did not.
+
 ### A test that breaks a real document must be able to put it back — or shout
 
 Contract-breaking tests are the ones worth having: they corrupt a number, run the checker, and demand

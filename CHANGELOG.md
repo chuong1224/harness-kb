@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-08-18
+
+### Added
+- **Blueprint: point a gate at its own source of truth, not only at the world it describes.** The
+  section on parsing already said to let the real parser render the verdict. That closes the
+  "almost right regex" hole and not the one behind it: real parsers are lenient by specification,
+  and every check you own may be aimed somewhere else entirely. Our registry gate compared one JSON
+  file against the vault in both directions for months without ever inspecting the file itself, and
+  two failures used the gap — an object carrying the same key twice, which `json.loads` resolves
+  silently to the last one, and a whole-file reformat that the format-preserving writer was about
+  to make permanent. Three consequences: check the shape of the source of truth in the same gate
+  (duplicate keys at every level, the formatting contract, records marked finished with no finish
+  date); never store the contract inside the artifact it governs, because one bad write can flip
+  the file and its judge together; and put the check ahead of the next write, because this class
+  erases its own evidence — both symptoms were gone before anyone looked, having never reached a
+  commit. The section closes on what did catch it, which was not a gate but an acceptance identity:
+  the byte delta of an edit must equal the bytes you meant to add. Gates catch the failure classes
+  someone imagined; keep one plain identity over the artifact for the classes nobody has.
+
 ## [1.14.1] - 2026-08-17
 
 ### Changed
@@ -583,6 +602,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.15.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.15.0
 [1.14.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.14.1
 [1.14.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.14.0
 [1.13.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.13.1
