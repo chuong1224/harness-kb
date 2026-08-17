@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.1] - 2026-08-17
+
+### Changed
+- **Blueprint: a verdict a gate states as fact must be re-derived, not parsed out of the failure.**
+  The "distinguish broken code from broken measurement" corollary had a trap inside it that we
+  walked into. Once that distinction earns its own verdict, the tempting way to detect it is to read
+  the error text — but a fixture can print any string, and the same exception arrives from causes the
+  label does not cover. Ours fires when a spreadsheet is open in a desktop editor; the identical
+  error also comes from ordinary filesystem permissions. A text-inferred label eventually lands on
+  the wrong failure, and then the gate confidently tells people to close an application that was
+  never open — worse than the blunt "it is red" it replaced, because it sounds specific. The section
+  now says to take the measurement again at classification time, and adds the two constraints that
+  keep such a verdict honest: it must block exactly as hard as a red suite and record no green mark,
+  and its trigger must stay narrow enough that unrelated failures cannot borrow it.
+
 ## [1.14.0] - 2026-08-16
 
 ### Added
@@ -568,6 +583,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.14.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.14.1
 [1.14.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.14.0
 [1.13.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.13.1
 [1.13.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.13.0

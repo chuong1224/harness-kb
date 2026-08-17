@@ -295,6 +295,26 @@ in the platform's locale encoding, so one separator character came back mangled,
 missed, and a suite scored 10 or 1 depending on which shell had launched the runner. The suite that
 only passes on one operator's machine has not been measured.
 
+The first corollary has a trap inside it, and we walked into it. Once you accept that *the
+measurement is broken* deserves its own verdict, you will want to detect that verdict from the
+failure text — the error names a missing library, or a locked file, so read the error and label it.
+Do not. A test fixture can print any string it likes, and the same exception can arrive from a cause
+your label does not cover: ours fires when a spreadsheet is open in a desktop editor, but the
+identical error also comes from ordinary filesystem permissions. A label inferred from text will
+eventually be claimed by the wrong failure, and then the gate is confidently sending people to close
+an application that was never open — worse than the blunt "it is red" it replaced, because it sounds
+specific. Earn the verdict instead: at the moment you classify, go and take the measurement again.
+Ours re-opens the file it just failed to read; if it opens now, the failure was something else and
+stays a plain failure. The general form: a diagnosis that a gate states as fact must be re-derived
+from the world at diagnosis time, never parsed out of the wreckage of the run that failed.
+
+Two things stay fixed while you add these verdicts. The new label must not become an escape hatch —
+ours still blocks exactly as hard as a red suite, still refuses to record a green mark, because the
+whole point is that nothing was verified; softening it to "skipped, exit zero" would rebuild the
+quiet channel two earlier rounds were spent closing. And keep the trigger narrow: ours only accepts
+the file extensions that the failure mode actually applies to, so an unrelated permission error is
+never dressed up in a diagnosis that does not fit it.
+
 ### Parse the format with a real parser, or your gate will lie about it
 
 The same "quiet reassurance" failure has a second, sneakier source: a gate that *approximates* the
