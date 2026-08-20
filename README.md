@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.16.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.17.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
@@ -99,6 +99,8 @@ harness-kb/
 │   ├── scripts/test_routine_guard.py  Break-the-wait tests for that guard
 │   ├── scripts/audit_gate.py     Refuses to end a turn while an audit is unclean (H4c)
 │   ├── scripts/test_audit_gate.py  Break-the-gate tests, including "does it block too much?"
+│   ├── scripts/derived_write_guard.py  A generator that refuses to shrink the artifact it owns
+│   ├── scripts/test_derived_write_guard.py  Break-the-guard tests: the shrink, and blocking wrongly
 │   ├── rules/gates.example.json  Which checkers the audit gate runs, and how to read them
 │   ├── hooks/settings.json       Example hooks: activity log, claim lock, tooling gate
 │   ├── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
@@ -220,11 +222,18 @@ python examples/scripts/worklist.py insight.json --out worklist.json
 # 9. Run every gate you own and report only what is NEW since the last clean run (H4c)
 python examples/scripts/audit_gate.py run --vault /path/to/your/vault \
        --config examples/rules/gates.example.json
+
+# 10. Let a generator refuse to overwrite its own output with fewer rows than it already has
+python examples/scripts/derived_write_guard.py --ledger ledger.json --out log.md
 ```
 
 > **Put these scripts inside the vault they serve.** A machine with the notes but without the tools
 > cannot verify or regenerate anything, and a second copy kept in per-machine config drifts from the
 > first with no audit able to see it. That failure grows with every machine you add — blueprint §5.
+>
+> Then note what the move costs: the generator can now run on machines whose *state* stayed behind,
+> where it will happily rewrite a shared artifact with a fraction of its history and exit 0. Step 10
+> is that guard — the port is not finished until the tool can refuse.
 
 Wire `claim.py` into a `PreToolUse` hook ([examples/hooks](./examples/hooks)) and the lock stops
 being advice: a write to a file another stream is editing is **blocked**, not merely discouraged.

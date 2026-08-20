@@ -239,6 +239,63 @@ artifact the old tool produced and reconcile until only genuine content changes 
 conventions surface fast that way: slug truncation limits, whether headings include the H1, what a
 missing frontmatter field defaults to.
 
+### Moving a tool inside also hands it a new way to do damage
+
+The section above is an argument for a move, so it is worth being explicit about what the move
+costs — because the honest answer is not "nothing". A generator sitting in one machine's config
+directory could only ever run *there*. Put it in the vault and every machine that syncs the vault
+can now run it. That is the entire benefit, and it is also the whole risk, because such a generator
+usually has two inputs and only one of them travels with it:
+
+- the **derived artifact** it writes, which lives inside the vault and is therefore synced, shared,
+  and read by everyone;
+- its **accumulated state** — a ledger, a cursor, a cache of what it has already seen — which is
+  per-machine and stays outside by the very exception the previous section grants. State is not
+  configuration, but it is exactly as machine-local, and a write-heavy ledger inside a file-syncing
+  folder buys you conflict copies rather than history.
+
+So the tool arrives on the second machine complete and runnable, and its memory arrives empty. Run
+it there and it does precisely what it was written to do: render the artifact from the state it can
+see. When we finished exactly this port, a run on the second machine would have replaced a 166-row
+performance log with the three runs that machine happened to hold. No error, no traceback, exit 0,
+a cheerful "wrote note" — and a hundred and sixty-three rows gone from the one file nobody
+re-reads, because it is generated and therefore assumed to be regenerable.
+
+Note what this is *not*. It is not the field-for-field mismatch of the previous paragraph, which
+shows up as a diff on the next sync and annoys you until you fix it. This one leaves no diff to
+notice: the file is exactly what the tool meant to write. And it is not fixed by being careful,
+because "only run the generator on the machine that has the ledger" is a rule that lives in
+somebody's head — the same class of guarantee this whole document exists to replace.
+
+**The port is not finished until the tool can refuse.** Most accumulating generators have an
+invariant sitting right there unused: *the record set only grows*. Ours unions by session id and
+keeps rows whose source transcripts were cleaned up long ago, so its count can rise or hold, never
+fall. Where such an invariant exists, the generator can check its own previous output before
+overwriting it — the artifact already claims more records than this run would write, therefore this
+run is not reading the state that produced it, therefore refuse and change nothing. One read of the
+file you were about to clobber turns silent loss into a loud, specific stop.
+
+Three properties decide whether that guard survives contact with a real morning:
+
+- **Fail closed on shrink, fail open on doubt.** A missing artifact, or one whose count line cannot
+  be parsed, is not evidence of loss — write anyway. A guard that blocks whenever it cannot parse
+  something becomes an outage the first time somebody restyles the template, and an outage is
+  visible in a way the loss never was, so it gets switched off and takes the real protection with it.
+- **The escape hatch must be explicit, and forbidden to the routine.** Deliberate truncation is
+  real: you merged ledgers, you rebuilt from scratch. So `--allow-shrink` has to exist — and the
+  scheduled prompt that runs the tool has to be told, in its own instructions, that it may never
+  add that flag to get past a refusal. A routine that retries with the override has automated the
+  guard away, which is worse than not having written it, because now the stop is on record as
+  handled.
+- **The artifact must state its own count.** The check reads a number the generator itself wrote on
+  the previous run, which is what makes it independent of any state the current machine holds. If
+  your template has no such line, add one first; a generated file that says how much it contains is
+  worth having regardless.
+
+Reference implementation: `examples/scripts/derived_write_guard.py`, with
+`examples/scripts/test_derived_write_guard.py` attacking both betrayals — letting the shrink
+through, and blocking a first run, a restyle, or an ordinary growing run.
+
 ### A gate nobody runs is not a gate
 
 Moving the tooling inside the vault raises the next question immediately: those scripts have tests —

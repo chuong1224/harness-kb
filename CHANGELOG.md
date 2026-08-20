@@ -4,6 +4,47 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-08-20
+
+### Added
+- **The cost of the move the blueprint spends a section recommending.** §5 argues that tooling
+  belongs inside the vault and lists what that fixes; it never said what the move *creates*.
+  A generator in one machine's config directory could only run there. Inside the vault, every
+  machine that syncs can run it — and such a generator usually has two inputs where only one
+  travels: the derived artifact it writes lives inside and is shared, while its accumulated
+  state (a ledger, a cursor) is per-machine and stays outside by the same exception §5 grants.
+  The tool therefore arrives on the second machine complete and its memory arrives empty.
+  Finishing exactly this port, a run on the other machine would have replaced a 166-row
+  performance log with the three runs that machine held — no error, no traceback, exit 0, and
+  163 rows gone from the one file nobody re-reads because it is generated. This is not the
+  field-for-field mismatch the section already warned about: that one shows up as a diff on
+  the next sync, while this leaves nothing to notice, because the file is exactly what the
+  tool meant to write.
+- **`derived_write_guard.py`** — the refusal that finishes the port. Most accumulating
+  generators have an unused invariant sitting right there: the record set only grows. Where it
+  holds, the generator can read the count its own previous run wrote into the artifact and
+  stop when this run would write fewer, which costs one read of the file it was about to
+  clobber and converts silent loss into a specific, loud stop naming how many rows were at
+  stake and which state file it read.
+- **Three properties that decide whether such a guard survives a real morning**, each argued in
+  the blueprint and asserted in the suite. It fails *closed* on a shrink but *open* on doubt — a
+  missing artifact or an unparseable count line is not evidence of loss, and a guard that blocks
+  whenever it cannot parse something becomes an outage the first time somebody restyles the
+  template, after which it gets switched off and takes the real protection with it. Its escape
+  hatch is explicit and forbidden to the routine: `--allow-shrink` has to exist because
+  deliberate truncation is real, and the scheduled prompt has to be told in its own instructions
+  that it may never add the flag to get past a refusal — a routine that retries with the
+  override has automated the guard away, and worse, left the stop on record as handled. And the
+  artifact must state its own count, which is what makes the check independent of any state the
+  machine currently holds.
+- **`test_derived_write_guard.py`** — 12 assertions attacking both betrayals rather than the
+  happy path: letting the shrink through (including the empty-ledger case, which is the one that
+  actually happens), and blocking something harmless (a first run, a restyled template, an
+  ordinary growing run). It also tests the round trip rather than the regex, since the guard
+  reads a number the renderer writes and a template edit that moves that line disarms it
+  silently. Breaking the comparison turns 3 red; making an absent artifact report 0 instead of
+  "no opinion" turns 2 more.
+
 ## [1.16.0] - 2026-08-18
 
 ### Added
@@ -649,6 +690,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.17.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.17.0
 [1.16.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.16.0
 [1.15.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.15.0
 [1.14.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.14.1
