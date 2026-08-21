@@ -6,8 +6,9 @@ A gate that is always green is worse than no gate: it manufactures confidence. T
 cases build a throwaway vault in the system temp directory with toy suites of every kind
 - passing, failing, hanging - and demand the runner react correctly: discover, catch red,
 respect the green marker, and block (or refrain from blocking) at exactly the right
-moments. Every command is given an explicit --vault and --state under temp, so a real
-vault is never touched.
+moments. Every command is given an explicit --vault under temp; all but the namespace
+regression also use an explicit --state. The default-state cases redirect LOCALAPPDATA
+under the same temp root, so a real vault and its marker are never touched.
 
 Run:   python examples/scripts/test_tooling_selfcheck.py
 Exit:  0 = all cases pass, 1 = at least one failed
@@ -442,6 +443,31 @@ def main() -> int:
         code, out = run(base("run"))
         report("49. non-ASCII from a suite survives the pipe, so the count cannot drift",
                code == 0 and "7 assertions" in out, out)
+
+        # --- one host, two vaults -------------------------------------------------
+        # The default state used to be keyed by hostname alone. Running this vault first
+        # and another vault second therefore made the second run inherit test_unicode.py
+        # as vanished coverage. Worse, an accepted or green run could overwrite the first
+        # vault's mark. Both commands deliberately omit --state to exercise the default.
+        default_cache = tmp / "default-cache"
+        default_env = {"LOCALAPPDATA": str(default_cache)}
+        code, out = run(["--vault", str(vault), "run"], env_extra=default_env)
+        marks_before = set((default_cache / "kb-tooling-selfcheck").glob("state-*.json"))
+        report("50. the default marker is written in a vault-specific namespace",
+               code == 0 and len(marks_before) == 1, out)
+
+        other_vault = tmp / "other vault"
+        (other_vault / ".obsidian").mkdir(parents=True)
+        other_test = other_vault / "Ops" / "Other Gate" / "attachments" / "test_other.py"
+        other_test.parent.mkdir(parents=True)
+        other_test.write_text("print('[PASS] other vault assertion')\n", encoding="utf-8")
+        code, out = run(["--vault", str(other_vault), "run"], env_extra=default_env)
+        marks_after = set((default_cache / "kb-tooling-selfcheck").glob("state-*.json"))
+        report("51. a second vault on the same host does not inherit the first vault's tests",
+               code == 0 and "test_other.py" in out and "test_unicode.py" not in out, out)
+        report("52. the two vaults keep separate default markers",
+               len(marks_after) == 2 and marks_before < marks_after,
+               "before=%r after=%r" % (marks_before, marks_after))
     finally:
         wipe(tmp)
         vault = None

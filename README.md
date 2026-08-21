@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.19.1-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.19.2-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
@@ -203,6 +203,8 @@ python examples/scripts/claim.py status --vault /path/to/your/vault
 
 # 5. Run the test suites that guard your own in-vault tooling
 python examples/scripts/tooling_selfcheck.py run --vault /path/to/your/vault
+#    Its default outside-vault marker is isolated by the canonical vault root, so two
+#    vaults on one host do not share coverage history. --state opts into sharing explicitly.
 
 # 5b. It also counts each suite's assertions and blocks when that number falls. When the
 #     drop is deliberate, lower the mark on the record instead of switching the gate off:

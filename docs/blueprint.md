@@ -254,6 +254,12 @@ usually has two inputs and only one of them travels with it:
   configuration, but it is exactly as machine-local, and a write-heavy ledger inside a file-syncing
   folder buys you conflict copies rather than history.
 
+Machine-local is a location, not a namespace. If one copy of the tool can serve several vaults on
+the same host, key that outside state by the canonical vault root (or a stable hash of it), not by
+hostname alone. Otherwise a demo vault can inherit a real vault's failures and test names, and the
+next accepted or green demo run can overwrite the real coverage mark. An explicit `--state` remains
+an intentional escape hatch; the unsafe sharing must never be the default.
+
 So the tool arrives on the second machine complete and runnable, and its memory arrives empty. Run
 it there and it does precisely what it was written to do: render the artifact from the state it can
 see. When we finished exactly this port, a run on the second machine would have replaced a 166-row

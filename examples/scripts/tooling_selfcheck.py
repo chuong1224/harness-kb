@@ -23,10 +23,12 @@ THE FIX. Two layers, and neither of them asks an agent to remember anything:
 
 "Changed" is mtime+size over every `attachments/*.py` (tools included: editing a tool
 invalidates yesterday's green run just as much as editing its test), compared against the
-fingerprint of the last GREEN run. That marker is a per-machine cache kept OUTSIDE the
-vault: two machines edit at different times, and a marker inside a synced folder is one
-more file for the sync to conflict over. Losing the cache costs one redundant run and can
-never produce a wrong answer.
+fingerprint of the last GREEN run. That marker is a per-machine, per-vault cache kept
+OUTSIDE the vault: two machines edit at different times, and a marker inside a synced
+folder is one more file for the sync to conflict over. The default filename includes a
+hash of the canonical vault root, so two vaults on one host cannot read or overwrite each
+other's coverage mark. Losing the cache costs one redundant run and can never produce a
+wrong answer.
 
 THREE SAFETY RULES, each learned the hard way:
   * **One runner at a time** (a lock). Suites that exercise a vault by mutating real
@@ -82,6 +84,7 @@ Python 3.8+, standard library only.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -132,8 +135,17 @@ def is_vault(p) -> bool:
     return bool(p) and any((Path(p) / m).exists() for m in ROOT_MARKERS)
 
 
-def state_path(explicit: str = "") -> Path:
-    """Per-machine cache, outside the vault (see module docstring)."""
+def _vault_key(vault: Path) -> str:
+    """Stable, filesystem-aware namespace without exposing the vault path in a filename."""
+    try:
+        root = os.path.normcase(str(vault.resolve()))
+    except (OSError, RuntimeError):
+        root = os.path.normcase(os.path.abspath(os.fspath(vault)))
+    return hashlib.sha256(root.encode("utf-8")).hexdigest()[:16]
+
+
+def state_path(vault: Path, explicit: str = "") -> Path:
+    """Per-machine, per-vault cache outside the vault (see module docstring)."""
     if explicit:
         return Path(explicit)
     env = os.environ.get("KB_TOOLING_STATE")
@@ -141,7 +153,8 @@ def state_path(explicit: str = "") -> Path:
         return Path(env)
     base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_CACHE_HOME") \
         or os.path.join(os.path.expanduser("~"), ".cache")
-    return Path(base) / "kb-tooling-selfcheck" / ("state-%s.json" % HOST)
+    return Path(base) / "kb-tooling-selfcheck" / (
+        "state-%s-%s.json" % (HOST, _vault_key(vault)))
 
 
 def gate_off() -> bool:
@@ -509,7 +522,7 @@ def run_all(vault: Path, timeout: int, quiet: bool = False):
 
 
 def cmd_run(args, vault: Path, details=None) -> int:
-    sp = state_path(args.state)
+    sp = state_path(vault, args.state)
     if args.if_stale:
         need, why = stale(vault, sp)
         if not need:
@@ -725,13 +738,13 @@ def cmd_list(args, vault: Path) -> int:
           % (scope, len(missing)))
     for m in missing:
         print("  - %s" % m)
-    need, why = stale(vault, state_path(args.state))
+    need, why = stale(vault, state_path(vault, args.state))
     print("\nGreen marker: %s (%s)" % ("needs a run" if need else "still valid", why))
     return 0
 
 
 def cmd_forget(args, vault: Path) -> int:
-    sp = state_path(args.state)
+    sp = state_path(vault, args.state)
     try:
         sp.unlink()
         print("Dropped the green marker: %s" % sp)
@@ -764,7 +777,7 @@ def cmd_hook_stop(args) -> int:
         vault = find_vault(Path(__file__).resolve())
     if not vault:
         return 0
-    sp = state_path(args.state)
+    sp = state_path(vault, args.state)
     need, why = stale(vault, sp)
     if not need:
         return 0                                 # the quiet path: ~0.2s per turn

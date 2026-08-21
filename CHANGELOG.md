@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.2] - 2026-08-21
+
+### Fixed
+- **A machine is not a vault namespace.** `tooling_selfcheck.py` used one default coverage
+  marker per hostname, so running the example against a second vault read the first vault's
+  test names and assertion counts. It produced a loud false coverage loss; a later green run or
+  `accept --reason` could also overwrite the first vault's trusted mark. The default marker now
+  includes a stable hash of the canonical vault root, keeping every vault on the host isolated
+  without exposing its path in the filename.
+- Explicit `--state` and `KB_TOOLING_STATE` paths still mean intentional sharing. The ambiguous
+  hostname-only marker is deliberately not migrated: each vault establishes a fresh baseline on
+  its first run. Three black-box cases run two vaults through one cache directory; two fail on
+  1.19.1 and all 52 pass with the repair.
+
 ## [1.19.1] - 2026-08-21
 
 ### Fixed
@@ -778,6 +792,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.19.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.2
 [1.19.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.1
 [1.19.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.0
 [1.18.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.18.1
