@@ -4,6 +4,33 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-08-21
+
+### Added
+- **What repairing the history taught, which fixing the mechanism could not.** 1.18.0 ended by
+  noting that a mechanism fix never cleans the record, and that the bad rows would stay bad until
+  a deliberate pass corrected them. That pass has now run — 21 rows, none guessed: 10 stated in
+  the task's own write-up, 6 named by a commit message, 5 traced with `git log -S` or by matching
+  claimed files against each candidate commit. §5 gains a section on the three things it surfaced.
+- **The count you inherit is not the work order.** Of the 22 rows the earlier round reported, one
+  was not actually wrong — its commit message named no task, which is what made it look wrong,
+  while the write-up showed the hash was that task's own third commit. Patching to match the
+  inherited number would have broken a correct row to satisfy a statistic.
+- **A repair can make a downstream report worse — and that is not a reason to record a false
+  value.** One repaired row had pointed at a *merge* commit, and `git show --name-only` lists
+  nothing for a merge, so that task had an empty footprint and collided with nobody. Its true
+  commit touches 20 files, and giving it that value made it collide with 139 other tasks: 139 of
+  the 141 new pairs the whole repair introduced. The true value was recorded anyway; the noise is
+  a defect in the pairing rule, which discounts enormous commits but not the ledger files every
+  task touches.
+- **A before/after comparison across time is confounded when several agents share the repository.**
+  The collision report read 9,639 before and 9,632 after — apparently no effect. Another stream had
+  finished a task between the two runs, adding roughly 72 pairs and masking almost all of it.
+  Scored against the same set by reverting the 21 rows in memory: 9,711 to 9,632, a reduction of
+  79, against a prediction of 80 made before touching anything. Prefer a scope that cannot drift
+  (*the rows this change touched*) over a global total any other stream can move — and predict
+  first, so a surprising result arrives as something to investigate rather than to rationalise.
+
 ## [1.18.1] - 2026-08-21
 
 ### Fixed
@@ -730,6 +757,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.19.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.0
 [1.18.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.18.1
 [1.18.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.18.0
 [1.17.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.17.0

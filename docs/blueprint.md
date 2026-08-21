@@ -609,6 +609,50 @@ A mechanism fix
 changes what happens next; it never retroactively cleans the record, and quietly conflating the two
 is how a system ends up believing it is healthier than it is.
 
+### Repairing the history teaches things the mechanism fix cannot
+
+That separate pass is worth its own section, because doing it surfaced three lessons the mechanism
+work never would have. It repaired 21 rows, and no row was guessed: 10 were stated outright in the
+task's own write-up, 6 were named by a commit message, and 5 had to be traced — with `git log -S` on
+a string only that task introduced, or by matching the files the write-up claimed against the files
+each candidate commit touched. On that fixed set of 21, rows naming their own task went from 0 to 16;
+the remaining 5 are individually accounted for, because the honest answer for some rows is *"this
+change rode inside a commit named after different work."*
+
+**The count you inherit is not the work order.** The earlier round had reported 22 bad rows. One of
+them was not bad: its commit message named no task, which is what made it *look* wrong, while the
+write-up showed the hash was genuinely that task's own third commit. Patching by the inherited number
+would have broken a correct row to satisfy a statistic. Re-derive the list at the moment you act on
+it, item by item, and let it come out a different size than the headline that justified the work.
+
+**A repair can make a downstream report worse, and that is not a reason to record a false value.**
+The field feeds a collision detector: tasks sharing files get flagged as possibly overwriting one
+another. One repaired row had been pointing at a *merge* commit — and `git show --name-only` on a
+merge lists nothing, so that task had an empty footprint and collided with nobody. Giving it its
+true commit, a 20-file one, made it collide with 139 others: it alone accounted for 139 of the 141
+new pairs the repair introduced. **The more accurate the data got, the louder the report got.** We
+recorded the true value anyway. Writing a hash we knew to be wrong so that a report would stay quiet
+is precisely the laundering the previous section is about, and the noise is a defect in the pairing
+rule — it discounts enormous commits but not the handful of ledger files every task necessarily
+touches — which now has its own worklist entry instead of a fudged row.
+
+**In a repository with several agents working at once, a before/after comparison across time is
+confounded.** We ran the collision report before the repair and after: 9,639 pairs, then 9,632. Read
+straight, that says the repair achieved almost nothing. It is wrong. Between the two runs another
+stream finished its own task, adding a write-up to the set being analysed and roughly 72 pairs with
+it, which masked nearly the whole effect. Measured properly — reverting the 21 rows in memory and
+scoring both versions against *the same* set — it is 9,711 to 9,632, a reduction of 79, against a
+prediction of 80 made before anything was touched. The same trap caught a second claim in the same
+round: a headline of *"rows naming their own task: 14 to 33"* was accurate when measured and stale
+minutes later, when the repair task itself closed and took its own hash. **Fix the set you measure,
+not the moment you measure it** — and prefer a scope that cannot drift, such as *the rows this change
+touched*, over a global total that every other stream can move.
+
+One habit made all three legible: predict first. The simulation that produced "−80, and one row will
+generate 138 of the new pairs" was run *before* the registry was modified, so the surprising result
+arrived as a confirmation to investigate rather than as a number to rationalise afterwards. A
+prediction you wrote down is the cheapest defence against explaining whatever you happen to get.
+
 ---
 
 ## 6. Roadmap: closing the loops
