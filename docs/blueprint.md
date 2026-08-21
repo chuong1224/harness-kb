@@ -641,7 +641,9 @@ confounded.** We ran the collision report before the repair and after: 9,639 pai
 straight, that says the repair achieved almost nothing. It is wrong. Between the two runs another
 stream finished its own task, adding a write-up to the set being analysed and roughly 72 pairs with
 it, which masked nearly the whole effect. Measured properly — reverting the 21 rows in memory and
-scoring both versions against *the same* set — it is 9,711 to 9,632, a reduction of 79, against a
+scoring both versions against *the same* set — it is 9,711 to 9,632, a reduction of 79 *(measured
+before the commit described in the next section existed; see it for why this no longer reproduces)*,
+against a
 prediction of 80 made before anything was touched. The same trap caught a second claim in the same
 round: a headline of *"rows naming their own task: 14 to 33"* was accurate when measured and stale
 minutes later, when the repair task itself closed and took its own hash. **Fix the set you measure,
@@ -652,6 +654,37 @@ One habit made all three legible: predict first. The simulation that produced "�
 generate 138 of the new pairs" was run *before* the registry was modified, so the surprising result
 arrived as a confirmation to investigate rather than as a number to rationalise afterwards. A
 prediction you wrote down is the cheapest defence against explaining whatever you happen to get.
+
+### Writing the finding down can destroy the evidence for it
+
+The figures above have a defect worth more than the figures. Re-run the same comparison a few
+minutes later and it no longer says −79 and 141 new pairs; it says −220 and 4. Nothing was edited,
+no script changed, and neither reading is a mistake. **The act of recording the finding altered its
+own input.**
+
+The inspector decides which commits belong to a task by searching commit messages for the task's
+identifier, then unions in the hash the registry holds. The commit that carried the repair explained
+the discovery in its own message — it contains the sentence naming the task and the 139 pairs. From
+that moment the reporting commit *is*, by the tool's definition, one of that task's commits. The
+"before" scenario therefore stopped having the empty footprint that produced the whole effect: zero
+files became four, and the 139-pair gap being reported evaporated because it had been written about.
+
+Two things follow. The narrow one: figures measured against a mutable attribution rule need the
+commit range they were taken at, or they are not reproducible, and a later reader re-running them
+will conclude the report was wrong rather than that the ground moved. The broad one is worse and is
+still open in our system: **every** write-up, postmortem, and audit note that names a task quietly
+enlarges that task's footprint. The foundational tasks — the ones everything else cites — accumulate
+files they never touched and collide with everything, which is the same false-alarm spiral the
+oversized-commit threshold was invented to stop, arriving by a different road. The repair has to
+distinguish *commits that did the work* from *commits that discuss it*; the cheapest available signal
+is position, since this project's convention puts the identifier at the start of the subject for the
+former and mid-sentence for the latter. Whatever the rule, it needs a test asserting that one commit
+mentioning five tasks does not become a commit of all five.
+
+The general form, which is not specific to git: **when your analysis tool attributes work by scanning
+text that you also write, your write-up is one of its inputs.** Any observer that reads the record it
+is also recorded in has this problem, and the only defences are to exclude your own reporting from
+the attribution, or to pin the measurement to a stated point in the record's history.
 
 ---
 

@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.1] - 2026-08-21
+
+### Fixed
+- **The figures 1.19.0 published stopped reproducing, and the reason is worth more than the
+  figures.** Re-running the same comparison minutes later gives −220 and 4 new pairs, not −79 and
+  141. Nothing was edited and neither reading is a mistake: **recording the finding altered its own
+  input.** The inspector decides which commits belong to a task by searching commit messages for the
+  task's identifier. The commit carrying the repair explained the discovery in its message — naming
+  the task and the 139 pairs — so from that moment the reporting commit *is* one of that task's
+  commits by the tool's own definition. The "before" scenario lost the empty footprint that produced
+  the effect (zero files became four), and the gap being reported evaporated because it had been
+  written about. §5 gains a section; the original figures now carry the point in the record's
+  history at which they were taken.
+- **The open problem this exposes, stated rather than fixed.** Every write-up, postmortem, and audit
+  note that names a task quietly enlarges that task's footprint, so the foundational tasks everything
+  cites accumulate files they never touched — the same false-alarm spiral the oversized-commit
+  threshold was built to stop, arriving by a different road. A repair must separate *commits that did
+  the work* from *commits that discuss it*, and needs a test asserting that one commit mentioning
+  five tasks does not become a commit of all five. Generalised: when your analysis tool attributes
+  work by scanning text you also write, your write-up is one of its inputs.
+
 ## [1.19.0] - 2026-08-21
 
 ### Added
@@ -757,6 +778,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.19.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.1
 [1.19.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.0
 [1.18.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.18.1
 [1.18.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.18.0
