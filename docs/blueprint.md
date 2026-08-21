@@ -555,9 +555,23 @@ runs before the round is committed.** The `HEAD` it reads is therefore the *prev
 commit. The field did not drift; it was never once right on a dirty tree.
 
 The measurements are worth stating because the failure is so quiet. Of 36 finished tasks carrying
-the field, **22 pointed at a commit belonging to a different task** — two of them at the same
-unrelated commit, which is the shape this bug always takes. Eight separate commits had already been
-spent hand-correcting the number after the fact. And the tool *knew*: it printed a warning saying
+the field, only **14** named their own task. **19 provably pointed at a different task's commit** —
+provably, because the recorded hash belongs to a commit whose own message names another task — and
+**3 more** pointed at a commit that names no task at all, where the message alone cannot say whose
+it is. Several pairs share one unrelated hash, which is the shape this bug always takes. Eight
+separate commits had already been spent hand-correcting the number after the fact.
+
+That 19-versus-22 distinction is not pedantry, and it is worth saying how it was caught. The first
+pass measured *"does the recorded commit's message name its own task?"* — that gives 22 — and then
+wrote the finding up as *"22 belonged to a different task."* The measurement was sound; the sentence
+was one notch stronger than it. A second audit pass, asking the narrower question, split the 22 into
+19 provable and 3 unattributable. The weaker claim had already shipped, publicly, in the release
+that first described this very fix. **The most common way a report lies is not a wrong number; it is
+a correct number carried into a sentence it does not support** — and the writer is exactly the wrong
+person to catch it on the first pass, which is why the second pass has to ask a different question
+rather than re-check the same one.
+
+And the tool *knew*: it printed a warning saying
 the tree was dirty and the operator should record the real commit afterwards. It detected the
 condition, wrote the wrong value anyway, and delegated the repair to a human. **A tool that can
 detect it is about to record something false, and records it regardless, has not warned you — it
@@ -590,7 +604,8 @@ strict, it is discarded.** `pending` plus a red gate forbids exactly the same fa
 standing in front of work that is legitimately in progress.
 
 One caveat we hold to, because fixing the mechanism is not the same as fixing the history: the 22
-existing wrong rows stayed wrong until a separate, deliberate pass corrected them. A mechanism fix
+rows that did not name their own task stayed wrong until a separate, deliberate pass corrected them.
+A mechanism fix
 changes what happens next; it never retroactively cleans the record, and quietly conflating the two
 is how a system ends up believing it is healthier than it is.
 

@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2026-08-21
+
+### Fixed
+- **A number in 1.18.0 was carried into a sentence it did not support.** That release said *"of 36
+  finished tasks carrying the field, 22 pointed at a commit belonging to a different task."* The
+  measurement behind 22 asked a broader question — *does the recorded commit's message name its own
+  task?* — and 22 is the right answer to that. A second audit pass asked the narrower one and split
+  it: **19** are provable (the recorded hash belongs to a commit whose own message names a different
+  task), while **3** point at a commit naming no task at all, where the message cannot say whose it
+  is. Only 14 named their own. §5 now states both figures and, since the failure is instructive,
+  says how it was caught: the writer of a finding is the wrong person to re-check it, and a second
+  pass that asks the *same* question just reproduces the first answer. Corrected as a patch release
+  rather than an amended tag, per the repo's own rule that a published tag is never rewritten.
+
 ## [1.18.0] - 2026-08-21
 
 ### Added
@@ -716,6 +730,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.18.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.18.1
 [1.18.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.18.0
 [1.17.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.17.0
 [1.16.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.16.0
