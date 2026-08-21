@@ -545,6 +545,55 @@ halve retrieval cost on large material, while answer quality barely moves — *"
 remain largely blind to shape."* A metric blind to the thing you are trying to protect makes a poor
 alarm, however reassuring it looks.
 
+### A tool that cannot know a value yet must say so, not guess
+
+Closing a unit of work should leave a trail back to the change: our registry stores, next to each
+finished task, the commit that carries it. The command that closes a task wrote that field
+automatically — it read `HEAD` and saved it. Reasonable, and wrong every single time, for a reason
+that is structural rather than careless: **the closing command writes the registry, so it always
+runs before the round is committed.** The `HEAD` it reads is therefore the *previous* round's
+commit. The field did not drift; it was never once right on a dirty tree.
+
+The measurements are worth stating because the failure is so quiet. Of 36 finished tasks carrying
+the field, **22 pointed at a commit belonging to a different task** — two of them at the same
+unrelated commit, which is the shape this bug always takes. Eight separate commits had already been
+spent hand-correcting the number after the fact. And the tool *knew*: it printed a warning saying
+the tree was dirty and the operator should record the real commit afterwards. It detected the
+condition, wrote the wrong value anyway, and delegated the repair to a human. **A tool that can
+detect it is about to record something false, and records it regardless, has not warned you — it
+has laundered a guess into a record.**
+
+The damage was not in the field itself but downstream. A second-layer inspector re-examines closed
+work, and it reads this field twice: as the "declared done" watermark for *who touched these files
+afterwards*, and as a seed for *which files this task owns*. Fed another task's commit, it attributes
+that task's files to this one and then reports the two as colliding. The layer built to catch drift
+was manufacturing false collisions — and false alarms are spent currency; after a few, nobody reads
+the report.
+
+The repair is to let the record hold three states instead of two. Clean tree: `HEAD` is genuinely
+this round's commit, store it. Dirty tree: store `pending` — *the honest value*, because at that
+instant the answer does not exist yet. Explicit override: accept an operator-supplied hash, after
+verifying it resolves to a real commit. Then make `pending` impossible to abandon: **the registry
+gate goes red while any finished task still carries it.** The loop becomes `close → commit →
+seal → green`, and the third step cannot be forgotten because the second step's own gate refuses
+to pass without it.
+
+Two design notes generalise. First, the sealing step needs a check of its own, or it just relocates
+the guess: ours refuses to attach a commit whose message does not name the task, since "the commit
+that happens to be `HEAD` right now" is exactly the assumption that failed in the first place. In
+batch mode it validates every target before writing any of them — a run that stops halfway leaves
+the registry in a state nobody can later reconstruct. Second, we rejected the more obvious fix.
+*Refuse to close while the tree is dirty* sounds stricter and is genuinely tempting; on a vault
+where several agents work concurrently the tree is essentially never clean, so that rule would block
+almost every close and teach people to route around it. **A guard that fires constantly is not
+strict, it is discarded.** `pending` plus a red gate forbids exactly the same falsehood without ever
+standing in front of work that is legitimately in progress.
+
+One caveat we hold to, because fixing the mechanism is not the same as fixing the history: the 22
+existing wrong rows stayed wrong until a separate, deliberate pass corrected them. A mechanism fix
+changes what happens next; it never retroactively cleans the record, and quietly conflating the two
+is how a system ends up believing it is healthier than it is.
+
 ---
 
 ## 6. Roadmap: closing the loops

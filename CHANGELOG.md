@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-08-21
+
+### Added
+- **A record that a tool writes before the value exists.** §5 gains the case where the guess is
+  not a rounding error but structural: the command that closes a unit of work also *writes* the
+  registry, so it necessarily runs before the round is committed — the `HEAD` it recorded as
+  "the commit carrying this change" was the previous round's, every time, on any dirty tree.
+  Measured on the source system: of 36 finished tasks carrying the field, **22 pointed at a
+  commit belonging to a different task**, and eight separate commits had already been spent
+  hand-correcting the number afterwards. The tool detected the condition — it printed a warning
+  that the tree was dirty — and wrote the false value anyway, which is the part worth naming:
+  detecting that you are about to record something untrue and recording it regardless is not a
+  warning, it is a guess laundered into a record.
+- **Why it mattered downstream, not locally.** A second-layer inspector reads that field both as
+  the "declared done" watermark and as a seed for which files a task owns; fed another task's
+  commit, it attributed that task's files and reported the pair as colliding. The layer built to
+  catch drift was generating false collisions — and a report that cries wolf is spent currency.
+- **The three-state repair, and the fix we rejected.** Clean tree → store `HEAD`; dirty tree →
+  store `pending`, the honest value; explicit override → accept a verified hash. `pending` cannot
+  be abandoned because the registry gate stays red while any finished task carries it, making the
+  loop `close → commit → seal → green`. Documented alongside it: the sealing step needs its own
+  check (refuse a commit whose message does not name the task; validate every target before
+  writing any, so a half-run cannot leave an unreconstructable state), and the tempting stricter
+  rule — *refuse to close on a dirty tree* — was rejected because on a multi-agent vault the tree
+  is never clean, and a guard that fires constantly gets routed around rather than obeyed.
+
 ## [1.17.0] - 2026-08-20
 
 ### Added
@@ -690,6 +716,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.18.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.18.0
 [1.17.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.17.0
 [1.16.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.16.0
 [1.15.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.15.0
