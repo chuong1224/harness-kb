@@ -15,6 +15,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+# The installed base version is read from the installable source, never spelled out here:
+# a literal turns every release into a test edit, and the edit that is forgotten reads as
+# a lifecycle bug rather than as a stale fixture.
+BASE_VERSION = json.loads((ROOT / "scaffold" / "release.json").read_text(encoding="utf-8"))["version"]
 FAILURES = []
 ASSERTIONS = 0
 
@@ -71,7 +75,7 @@ def commit_source(repo, message):
 def make_base_source(temp):
     source = temp / "source-v1"
     copy_repo(ROOT, source)
-    return source, commit_source(source, "Fixture release v1.20.0")
+    return source, commit_source(source, "Fixture release v%s" % BASE_VERSION)
 
 
 def make_new_source(old_source, temp, forced_red=False):
@@ -118,7 +122,7 @@ class ReleaseHandler(http.server.BaseHTTPRequestHandler):
         payload = [
             {"tag_name": "v1.22.0", "html_url": "https://example/v1.22.0", "zipball_url": "", "published_at": "2026-08-24", "draft": False, "prerelease": False},
             {"tag_name": "v1.21.0", "html_url": "https://example/v1.21.0", "zipball_url": "", "published_at": "2026-08-23", "draft": False, "prerelease": False},
-            {"tag_name": "v1.20.0", "html_url": "https://example/v1.20.0", "zipball_url": "", "published_at": "2026-08-22", "draft": False, "prerelease": False},
+            {"tag_name": "v%s" % BASE_VERSION, "html_url": "https://example/base", "zipball_url": "", "published_at": "2026-08-22", "draft": False, "prerelease": False},
         ]
         body = json.dumps(payload).encode("utf-8")
         self.send_response(200)
@@ -197,7 +201,7 @@ def main():
 
         manifest1 = json.loads((vault1 / ".harness" / "manifest.json").read_text(encoding="utf-8"))
         manifest2 = json.loads((vault2 / ".harness" / "manifest.json").read_text(encoding="utf-8"))
-        check("manifest records exact installed version and commit", manifest1["installed"]["version"] == "1.20.0" and manifest1["installed"]["commit"] == commit1)
+        check("manifest records exact installed version and commit", manifest1["installed"]["version"] == BASE_VERSION and manifest1["installed"]["commit"] == commit1)
         check("manifest records ownership and base hash per component", all(item["ownership"] in {"user", "upstream"} and len(item["base_hash"]) == 64 for item in manifest1["components"]))
         check("two vaults never share lifecycle identity", manifest1["vault_id"] != manifest2["vault_id"])
 
@@ -247,7 +251,7 @@ def main():
 
         rolled = run([sys.executable, vault1 / ".harness" / "harness.py", "rollback", vault1, "--backup", backup_id])
         restored = json.loads((vault1 / ".harness" / "manifest.json").read_text(encoding="utf-8"))
-        check("manual rollback restores old manifest and bytes", rolled.returncode == 0 and restored["installed"]["version"] == "1.20.0" and (vault1 / ".harness" / "scripts" / "generate_catalog.py").read_bytes() == before_catalog and not (vault1 / ".harness" / "scripts" / "new_tool.py").exists(), text(rolled))
+        check("manual rollback restores old manifest and bytes", rolled.returncode == 0 and restored["installed"]["version"] == BASE_VERSION and (vault1 / ".harness" / "scripts" / "generate_catalog.py").read_bytes() == before_catalog and not (vault1 / ".harness" / "scripts" / "new_tool.py").exists(), text(rolled))
         check("rollback also preserves user-owned customization", (vault1 / "AGENTS.md").read_text(encoding="utf-8") == custom_agents)
 
         tamper_path = vault1 / ".harness" / "plans" / "tampered.json"
@@ -284,7 +288,7 @@ def main():
         red_doc = json.loads(red_plan.read_text(encoding="utf-8")) if red_plan.exists() else {}
         applied_red = run([sys.executable, vault1 / ".harness" / "harness.py", "apply", vault1, "--plan", red_plan]) if planned_red.returncode == 0 else planned_red
         after_red = json.loads((vault1 / ".harness" / "manifest.json").read_text(encoding="utf-8"))
-        check("red post-upgrade gate triggers automatic rollback", planned_red.returncode == 0 and applied_red.returncode == 1 and b"ROLLED BACK" in applied_red.stdout and after_red["installed"]["version"] == "1.20.0", text(applied_red))
+        check("red post-upgrade gate triggers automatic rollback", planned_red.returncode == 0 and applied_red.returncode == 1 and b"ROLLED BACK" in applied_red.stdout and after_red["installed"]["version"] == BASE_VERSION, text(applied_red))
         check("automatic rollback keeps its forensic backup", bool(red_doc) and (vault1 / ".harness" / "backups" / red_doc["plan_id"] / "backup.json").is_file())
 
         final_verify = run([sys.executable, vault1 / ".harness" / "harness.py", "verify", vault1])

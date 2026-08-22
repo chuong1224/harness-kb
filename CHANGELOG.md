@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counter-test the finding asked for is in place — one message naming five identifiers stays out of
   all five footprints — beside a body-mention case, a real work commit, a registry-recorded hash
   with no label, and a table of every label shape the history contains.
+- The lifecycle suite no longer spells the installed base version out as a literal. It reads the
+  version from `scaffold/release.json`, so a release cannot leave three assertions failing on a
+  stale fixture and make a routine bump look like a lifecycle bug.
 
 ## [1.20.0] - 2026-08-22
 
