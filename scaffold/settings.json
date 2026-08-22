@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.harness/scripts/claim.py\" hook",
+            "shell": "bash",
+            "timeout": 15,
+            "statusMessage": "claim lock: requesting write access"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.harness/scripts/audit_gate.py\" hook-stop --config \"$CLAUDE_PROJECT_DIR/.harness/rules/gates.json\" --state \"$CLAUDE_PROJECT_DIR/.harness/state/audit-gate.json\"",
+            "shell": "bash",
+            "timeout": 360,
+            "statusMessage": "audit gate: checking for new findings"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.harness/scripts/claim.py\" end",
+            "shell": "bash",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "_comment": "The vault-owned source of truth for enumerable rules. Add areas and controlled tags here before adding domain notes; keep documents derived from these values.",
+  "version": 1,
+  "areas": [],
+  "tags": {
+    "controlled_vocabulary": ["reference", "index"],
+    "index_only_tag": "index",
+    "rules": {
+      "index_files_have_only_the_index_tag": true,
+      "no_single_use_tags": true
+    }
+  },
+  "frontmatter": {
+    "required": ["title", "aliases", "summary", "tags"],
+    "optional": ["date", "updated", "type", "source", "file_digest", "gate_ignore"],
+    "types": ["reference", "index", "project", "data"]
+  },
+  "structure": {
+    "note_folder_pattern": "one folder per note, with an attachments/ subfolder",
+    "index_filename_pattern": "Index - <Folder Name>",
+    "index_required_when_folder_has_at_least_n_notes": 2
+  },
+  "attachments": {
+    "binary_extensions_requiring_digest": [".xlsx", ".xls", ".csv", ".pdf", ".docx", ".pptx"],
+    "image_extensions": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"]
+  },
+  "scan": {
+    "exclude_dirs": [".git", ".obsidian", ".harness", ".claude", ".claims", "node_modules", "attachments"],
+    "exclude_dir_prefixes": [".", "_"]
+  },
+  "documents": {
+    "marker_prefix": "rules",
+    "claim_types": {},
+    "consumers": [],
+    "retired_tags": [],
+    "scan_heuristics": {
+      "min_value": {"tag": 3, "area": 2, "index": 2},
+      "retired_mention_ok": ["retired", "removed", "dropped", "no longer"]
+    }
+  }
+}

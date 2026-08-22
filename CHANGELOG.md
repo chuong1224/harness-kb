@@ -4,6 +4,36 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-08-22
+
+### Added
+- **A repository link can now produce a real harness, not only explain one.**
+  `examples/scripts/harness.py init` creates a clean target with a user-owned `AGENTS.md`, a thin
+  `CLAUDE.md` pointer, in-vault rules and gates, coordination hooks and the runnable tooling. It
+  copies no demo notes, repository history or maintainer-private policy.
+- `.harness/manifest.json` records the source repository, installed version and exact commit,
+  a per-vault identity, and each component's source/target path, ownership, base hash and installed
+  hash. A dirty source checkout is rejected rather than paired with a commit that does not describe
+  its bytes.
+- Consumer-side update delivery: an explicitly consented GitHub check, a 24-hour cache stored
+  inside that vault, silent/non-blocking offline behavior, and an exact count of stable releases
+  between the installed and latest versions.
+- A two-step lifecycle: `plan` shows changelog range, migration impact, ownership decisions and
+  three-way conflicts before mutation; `apply` rejects stale plans, backs up every touched path,
+  runs the new gates and automatically restores the previous bytes on red. Successful upgrades
+  retain the same backup as a named manual rollback handle.
+- `test_harness.py` exercises two vaults on one host, consent and cache isolation, a fake newer
+  release, user customization, managed-file conflicts, safe apply, manual rollback and a forced
+  post-upgrade gate failure. The target's audit baseline is explicitly namespaced inside the vault,
+  so installed state and ledgers are never shared merely because two vaults use one machine.
+- Repository-level `AGENTS.md` is now the multi-agent contributor entrypoint; `CLAUDE.md` is a thin
+  pointer to it. `scaffold/release.json` is the declarative installable source and is version-locked
+  to the README badge and changelog by the release metadata gate.
+
+### Changed
+- README and the blueprint now distinguish publishing a release from delivering it to a consumer,
+  and define bootstrap plus lifecycle as two control loops the harness itself must close.
+
 ## [1.19.2] - 2026-08-21
 
 ### Fixed
@@ -792,6 +822,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.0
 [1.19.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.2
 [1.19.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.1
 [1.19.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.0

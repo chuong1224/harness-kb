@@ -1,0 +1,6 @@
+# Harness KB runtime state (installed tooling and manifest remain tracked)
+.harness/backups/
+.harness/cache/
+.harness/plans/
+.harness/state/
+.claims/

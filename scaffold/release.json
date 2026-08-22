@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "product": "harness-kb",
+  "version": "1.20.0",
+  "repository": "https://github.com/chuong1224/harness-kb",
+  "default_cache_seconds": 86400,
+  "migration_impact": [
+    "First install creates an in-vault .harness control plane; it never copies demo notes or private data.",
+    "AGENTS.md, CLAUDE.md, .gitignore, .claude/settings.json and the vault rules are user-owned after creation and upgrades never overwrite or recreate them.",
+    "Installed scripts are upstream-owned. A local edit becomes a visible plan conflict instead of being overwritten.",
+    "Network update checks require explicit consent, cache successful results for 24 hours, and do not fail or warn merely because the machine is offline."
+  ],
+  "components": [
+    {"source": "scaffold/AGENTS.md", "target": "AGENTS.md", "ownership": "user"},
+    {"source": "scaffold/CLAUDE.md", "target": "CLAUDE.md", "ownership": "user"},
+    {"source": "scaffold/gitignore.txt", "target": ".gitignore", "ownership": "user"},
+    {"source": "scaffold/kb-root.txt", "target": ".kb-root", "ownership": "upstream"},
+    {"source": "scaffold/settings.json", "target": ".claude/settings.json", "ownership": "user"},
+    {"source": "scaffold/rules.json", "target": ".harness/rules/rules.json", "ownership": "user"},
+    {"source": "scaffold/gates.json", "target": ".harness/rules/gates.json", "ownership": "user"},
+    {"source": "examples/scripts/harness.py", "target": ".harness/harness.py", "ownership": "upstream"},
+    {"source": "examples/scripts/verify_kb.py", "target": ".harness/scripts/verify_kb.py", "ownership": "upstream"},
+    {"source": "examples/scripts/check_rules_drift.py", "target": ".harness/scripts/check_rules_drift.py", "ownership": "upstream"},
+    {"source": "examples/scripts/generate_catalog.py", "target": ".harness/scripts/generate_catalog.py", "ownership": "upstream"},
+    {"source": "examples/scripts/claim.py", "target": ".harness/scripts/claim.py", "ownership": "upstream"},
+    {"source": "examples/scripts/tooling_selfcheck.py", "target": ".harness/scripts/tooling_selfcheck.py", "ownership": "upstream"},
+    {"source": "examples/scripts/audit_gate.py", "target": ".harness/scripts/audit_gate.py", "ownership": "upstream"},
+    {"source": "examples/scripts/auto_fix.py", "target": ".harness/scripts/auto_fix.py", "ownership": "upstream"},
+    {"source": "examples/scripts/routine_guard.py", "target": ".harness/scripts/routine_guard.py", "ownership": "upstream"},
+    {"source": "examples/scripts/worklist.py", "target": ".harness/scripts/worklist.py", "ownership": "upstream"},
+    {"source": "examples/scripts/derived_write_guard.py", "target": ".harness/scripts/derived_write_guard.py", "ownership": "upstream"}
+  ],
+  "gates": [
+    {
+      "name": "integrity",
+      "argv": ["{python}", ".harness/scripts/verify_kb.py", "{vault}", "--rules", ".harness/rules/rules.json"],
+      "timeout": 180
+    },
+    {
+      "name": "rules-drift",
+      "argv": ["{python}", ".harness/scripts/check_rules_drift.py", "{vault}", "--rules", ".harness/rules/rules.json", "--json"],
+      "timeout": 180
+    }
+  ]
+}

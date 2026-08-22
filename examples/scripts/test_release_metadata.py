@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Regression gate for release metadata: badge, changelog entries, and links."""
+"""Regression gate for release metadata and installable-source identity."""
+import json
 import re
 from pathlib import Path
 
@@ -7,6 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHANGELOG = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+SOURCE_RELEASE = json.loads((ROOT / "scaffold" / "release.json").read_text(encoding="utf-8"))
+AGENTS = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+CLAUDE = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
 RELEASE_BASE = "https://github.com/chuong1224/harness-kb/releases/tag/v"
 ENTRY_RE = re.compile(r"(?m)^## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}$")
 LINK_RE = re.compile(r"(?m)^\[(\d+\.\d+\.\d+)\]: (\S+)$")
@@ -44,6 +48,15 @@ check("README badge equals newest changelog entry",
       bool(badge) and bool(entries) and badge.group(1) == entries[0],
       {"badge": badge.group(1) if badge else None,
        "newest": entries[0] if entries else None})
+check("installable source version equals newest changelog entry",
+      bool(entries) and SOURCE_RELEASE.get("version") == entries[0],
+      {"source": SOURCE_RELEASE.get("version"), "newest": entries[0] if entries else None})
+check("repo has one substantive multi-agent entrypoint",
+      "## Before you commit" in AGENTS and "Read and follow `AGENTS.md`" in CLAUDE
+      and len(CLAUDE.splitlines()) < 8)
+check("lifecycle tool ships with its break-the-tool suite",
+      (ROOT / "examples" / "scripts" / "harness.py").is_file()
+      and (ROOT / "examples" / "scripts" / "test_harness.py").is_file())
 
 print("\nSUMMARY:", ("FAIL %d checks" % len(fails)) if fails else "ALL PASS")
 raise SystemExit(1 if fails else 0)

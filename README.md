@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.19.2-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.20.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
@@ -11,8 +11,10 @@
 > a correctness problem: stale indexes, contradictory rules, and broken links quietly make
 > the agent miss data. At scale, you cannot hand-maintain your way out of this.
 >
-> **Harness KB** is a small blueprint — plus reference artifacts — for a KB that keeps
-> *itself* correct, fresh, and fast to retrieve. It is the architecture, not an app.
+> **Harness KB** is a blueprint plus a lifecycle-safe scaffold for a KB that keeps
+> *itself* correct, fresh, and fast to retrieve. An agent can read this repository and
+> build a runnable harness in a clean folder; it is still transparent files and scripts,
+> not a hosted app.
 > Everything runs on the Python standard library, with [one deliberate exception](#dependencies).
 
 _Provenance: this blueprint reflects a real working system as of **2026-07-25**. The concepts are
@@ -78,8 +80,14 @@ half; the closed loop is what most systems never reach.
 
 ```
 harness-kb/
+├── AGENTS.md                      Multi-agent source of truth for contributors
+├── CLAUDE.md                      Thin pointer to AGENTS.md
 ├── docs/
 │   └── blueprint.md              The architecture: scorecard, loop diagnosis, roadmap, safety
+├── scaffold/
+│   ├── release.json              Installable components, ownership, gates, migration impact
+│   ├── AGENTS.md + CLAUDE.md      Generic target-vault entrypoints (main + thin pointer)
+│   └── rules.json + gates.json    A vault-owned starting contract, not demo data
 ├── examples/
 │   ├── rules/rules.example.json  Single source of truth for tags/areas (the H1 pattern)
 │   ├── scripts/verify_kb.py      Integrity gate — the "verify" step of the loop
@@ -101,6 +109,8 @@ harness-kb/
 │   ├── scripts/test_audit_gate.py  Break-the-gate tests, including "does it block too much?"
 │   ├── scripts/derived_write_guard.py  A generator that refuses to shrink the artifact it owns
 │   ├── scripts/test_derived_write_guard.py  Break-the-guard tests: the shrink, and blocking wrongly
+│   ├── scripts/harness.py         Init, update check, upgrade plan/apply, backup and rollback
+│   ├── scripts/test_harness.py    Two-vault black-box lifecycle and forced-rollback tests
 │   ├── rules/gates.example.json  Which checkers the audit gate runs, and how to read them
 │   ├── hooks/settings.json       Example hooks: activity log, claim lock, tooling gate
 │   ├── routines/kb-audit-daily.SKILL.md  Template for a scheduled daily audit agent
@@ -108,8 +118,10 @@ harness-kb/
 └── LICENSE
 ```
 
-The example scripts are **reference implementations** — dependency-free, standard-library only —
-that make the blueprint concrete. They are meant to be read and adapted, not vendored blindly.
+The example scripts remain readable **reference implementations**. The scaffold installs a pinned
+subset inside the vault on purpose — not blindly: `.harness/manifest.json` records exact source
+version/commit, ownership and a base hash for every component, so later change is a three-way
+decision instead of an overwrite.
 
 ### How the pieces run, on an ordinary morning
 
@@ -182,7 +194,48 @@ against, so the gate refuses to do it — even about itself.
 
 ## Quickstart
 
-The scripts run on any folder of Markdown notes (a "vault"). Python 3.8+; see
+### Build an agent-ready vault
+
+Clone this repository, then give the installer a clean target folder. The network choice is
+required rather than implied: `--allow-network-checks` records consent for cached GitHub release
+checks; use `--no-network-checks` for a permanently local install.
+
+```bash
+git clone https://github.com/chuong1224/harness-kb.git
+python harness-kb/examples/scripts/harness.py init my-vault --allow-network-checks
+cd my-vault
+python .harness/harness.py verify .
+```
+
+That creates no demo notes and copies no repository history. It creates:
+
+- `AGENTS.md` as the user-owned, multi-agent source of truth and a thin `CLAUDE.md` pointer;
+- `.harness/manifest.json` with source repo, installed version and exact commit, plus ownership,
+  base hash and installed hash for every component;
+- in-vault gates, rules, coordination tooling and a per-vault lifecycle control plane;
+- an optional Claude hook file whose claim and audit state is explicitly namespaced inside this
+  vault, never shared with another vault on the same machine.
+
+Run `python .harness/harness.py check .` at session start. A consented check uses a 24-hour
+per-vault cache, reports the exact number of stable releases you are behind, and exits quietly
+without an offline warning if the network is unavailable.
+
+Upgrade is deliberately two commands, so review exists before mutation:
+
+```bash
+git -C harness-kb pull --ff-only
+python .harness/harness.py plan . --source ../harness-kb
+python .harness/harness.py apply . --plan .harness/plans/<reviewed-plan>.json
+```
+
+The plan shows changelog range, migration impact, user-owned files that will be preserved and any
+upstream/local conflict. Apply backs up every touched path, refuses a stale plan, runs the new
+gates, and restores the old bytes automatically if a gate is red. Its success output includes a
+persistent `rollback --backup <id>` handle.
+
+### Run individual reference tools
+
+The scripts also run directly on any folder of Markdown notes (a "vault"). Python 3.8+; see
 [Dependencies](#dependencies) for the single optional package.
 
 ```bash
@@ -232,6 +285,8 @@ python examples/scripts/derived_write_guard.py --ledger ledger.json --out log.md
 > **Put these scripts inside the vault they serve.** A machine with the notes but without the tools
 > cannot verify or regenerate anything, and a second copy kept in per-machine config drifts from the
 > first with no audit able to see it. That failure grows with every machine you add — blueprint §5.
+> The `init` command above is the reproducible way to do that: it installs a declared component set
+> and keeps provenance instead of asking a user or agent to copy an informal list by hand.
 >
 > Then note what the move costs: the generator can now run on machines whose *state* stayed behind,
 > where it will happily rewrite a shared artifact with a fraction of its history and exit 0. Step 10
@@ -282,8 +337,15 @@ Phần lớn "bộ não thứ hai" đều mục theo thời gian. Khi một AI a
 nát trở thành vấn đề *tính đúng*: index lỗi thời, quy tắc mâu thuẫn, link gãy — âm thầm khiến
 agent **sót dữ liệu**. Ở quy mô lớn, không thể bảo trì tay mãi được.
 
-**Harness KB** là một blueprint nhỏ, không phụ thuộc thư viện, kèm các artifact mẫu, cho một KB
-tự giữ mình **đúng — tươi — truy xuất nhanh**. Đây là *kiến trúc*, không phải một app.
+**Harness KB** là một blueprint nhỏ kèm bộ dựng có vòng đời an toàn, cho một KB tự giữ mình
+**đúng — tươi — truy xuất nhanh**. Đây là các file và script minh bạch, không phải một app dịch vụ.
+
+Một agent chỉ cần đọc repo rồi chạy `harness.py init` là dựng được vault có `AGENTS.md` làm luật
+chính, `CLAUDE.md` mỏng dẫn vào đó, gate chạy thật và manifest ghi đúng phiên bản/commit đã cài.
+Phía người dùng có kênh biết mình chậm bao nhiêu release; kiểm tra mạng phải được đồng ý trước,
+có cache riêng từng vault và im lặng khi offline. Nâng cấp luôn tách `plan` khỏi `apply`: file do
+người dùng sở hữu được giữ nguyên, file tooling bị sửa tay thành xung đột nhìn thấy được, mọi thay
+đổi có backup, gate đỏ thì tự hoàn nguyên và lần nâng cấp thành công vẫn để lại lệnh rollback.
 
 **Ý tưởng cốt lõi:** một đống dashboard mà người vẫn phải tự tay sửa mọi thứ = *buồng lái*,
 chưa phải harness. Harness thật là một **vòng điều khiển khép kín**: cảm biến độ lệch → quyết

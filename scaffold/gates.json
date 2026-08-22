@@ -1,0 +1,17 @@
+{
+  "_doc": "Installed gate commands. Paths are vault-relative so a clone on a clean machine runs the same checks.",
+  "gates": [
+    {
+      "name": "integrity",
+      "cmd": ["{python}", "../scripts/verify_kb.py", "{vault}", "--rules", "rules.json"],
+      "parse": "lines:^\\s*\\[ERR\\s*\\]\\s+(.+)$",
+      "paths": ["**"]
+    },
+    {
+      "name": "rules-drift",
+      "cmd": ["{python}", "../scripts/check_rules_drift.py", "{vault}", "--rules", "rules.json", "--json"],
+      "parse": "json:errors",
+      "paths": ["**"]
+    }
+  ]
+}

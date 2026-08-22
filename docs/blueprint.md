@@ -692,6 +692,37 @@ text that you also write, your write-up is one of its inputs.** Any observer tha
 is also recorded in has this problem, and the only defences are to exclude your own reporting from
 the attribution, or to pin the measurement to a stated point in the record's history.
 
+### A blueprint is not delivered until a consumer can install and evolve it
+
+A maintainer can have perfect SemVer, tags and release notes while every user remains stranded on
+the first copy they made. Publication is an upstream fact; **update delivery is a consumer loop**.
+Likewise, a quickstart that runs a checker against an existing vault proves the checker works, not
+that a new agent can construct the system the document describes.
+
+An installable harness therefore needs two closed loops of its own:
+
+| Loop | Evidence that closes it |
+|---|---|
+| **Bootstrap** | One explicit command creates a clean target with a multi-agent entrypoint, in-vault tooling and gates. A fresh agent follows the entrypoint and produces a green gate without copying demo notes or maintainer-private policy. |
+| **Lifecycle** | The target records source repository, installed version and exact commit, component ownership and base hashes; a consented cached check reports release distance; upgrade is plan-before-apply with backup, gates and rollback. |
+
+The ownership boundary is load-bearing. Human policy, local rules and agent instructions are
+**user-owned**: create them once and never overwrite or recreate them. Executable reference tooling
+is **upstream-owned**: update it only when its current bytes still equal the recorded base. A local
+edit to upstream-owned tooling is not permission to discard the edit; it is a visible conflict that
+must be resolved before a fresh plan. This is the same two-source rule as a safe auto-fixer, applied
+to software distribution.
+
+Network behavior is part of the product contract, not an implementation detail. Consent must be
+recorded, successful checks cached per vault, and an offline machine must keep working without a
+new red alarm merely because it is offline. State named only by hostname is not per-vault state:
+two vaults on one machine must not share their cache, ledger, baseline, plan, backup or identity.
+
+**Shipped here:** `examples/scripts/harness.py`, the declarative component list in
+`scaffold/release.json`, generic target entrypoints under `scaffold/`, and a black-box suite that
+installs two vaults, simulates newer releases, preserves user customization, forces conflicts and
+proves both automatic and manual rollback.
+
 ---
 
 ## 6. Roadmap: closing the loops
@@ -1011,8 +1042,12 @@ The KB qualifies as a harness in the full sense when these are **measurable**:
 - [ ] **Multi-agent access uses a mechanical lock**, not discipline (via H4).
 - [ ] **Every operational loop has all five stages:** sensor + threshold + action + verification +
       rollback.
+- [x] **A fresh consumer can bootstrap and evolve the harness:** one command creates agent
+      entrypoints and runnable gates; provenance and ownership are recorded; updates require
+      consent, report release distance, preserve customization, and prove backup + rollback in a
+      fake-newer-release test.
 
-When all five are green, the human is genuinely reduced to *supervising and approving high-risk
+When all six are green, the human is genuinely reduced to *supervising and approving high-risk
 changes* — the definition in §1.
 
 ---
