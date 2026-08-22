@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.2] - 2026-08-22
+
+### Fixed
+- **Update delivery now reads the release surface the repository actually publishes.** The first
+  lifecycle release queried GitHub Release objects, but this repository has always published
+  stable versions as annotated or lightweight SemVer tags. A real API audit therefore returned
+  zero Release objects alongside the full tag history, producing a false "no update" result.
+  The checker now reads and paginates stable `vX.Y.Z` tags, invalidates the incompatible old cache,
+  and continues to keep consent, per-vault caching and silent offline behavior.
+- The fake update server now accepts only the GitHub tags route, so changing the implementation
+  back to the unused Releases route makes the black-box lifecycle suite fail. The suite has 32
+  assertions, including rejection of a still-fresh cache written by the faulty route.
+
 ## [1.20.1] - 2026-08-22
 
 ### Fixed
@@ -845,6 +858,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.2
 [1.20.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.1
 [1.20.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.0
 [1.19.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.2

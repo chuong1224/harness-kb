@@ -388,7 +388,11 @@ def read_cache(path, max_age):
     try:
         doc = load_json(path, "update cache")
         age = time.time() - float(doc.get("fetched_unix", 0))
-        if age <= max_age and isinstance(doc.get("releases"), list):
+        if (
+            age <= max_age
+            and doc.get("source") == "github-tags"
+            and isinstance(doc.get("releases"), list)
+        ):
             return doc
     except (HarnessError, TypeError, ValueError):
         pass
@@ -397,34 +401,46 @@ def read_cache(path, max_age):
 
 def fetch_release_catalog(repository, api_base, timeout):
     owner, repo = github_repo_parts(repository)
-    url = api_base.rstrip("/") + "/repos/%s/%s/releases?per_page=100" % (owner, repo)
-    request = urllib.request.Request(
-        url,
-        headers={"Accept": "application/vnd.github+json", "User-Agent": "harness-kb-lifecycle"},
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    if not isinstance(payload, list):
-        raise ValueError("release endpoint did not return a list")
     releases = []
-    for item in payload:
-        if not isinstance(item, dict) or item.get("draft") or item.get("prerelease"):
-            continue
-        tag = str(item.get("tag_name", ""))
-        version = tag[1:] if tag.startswith("v") else tag
-        if not VERSION_RE.fullmatch(version):
-            continue
-        releases.append(
-            {
-                "version": version,
-                "tag": tag,
-                "url": item.get("html_url", ""),
-                "zipball_url": item.get("zipball_url", ""),
-                "published_at": item.get("published_at", ""),
-            }
+    page = 1
+    while True:
+        url = api_base.rstrip("/") + "/repos/%s/%s/tags?per_page=100&page=%d" % (owner, repo, page)
+        request = urllib.request.Request(
+            url,
+            headers={"Accept": "application/vnd.github+json", "User-Agent": "harness-kb-lifecycle"},
         )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError("tag endpoint did not return a list")
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            tag = str(item.get("name", ""))
+            version = tag[1:] if tag.startswith("v") else tag
+            if not VERSION_RE.fullmatch(version):
+                continue
+            releases.append(
+                {
+                    "version": version,
+                    "tag": tag,
+                    "url": repository.rstrip("/") + "/releases/tag/" + tag,
+                    "zipball_url": item.get("zipball_url", ""),
+                    "published_at": "",
+                }
+            )
+        if len(payload) < 100:
+            break
+        page += 1
+        if page > 60:
+            raise ValueError("cannot certify exact release distance beyond 6000 tags")
     releases.sort(key=lambda item: semver(item["version"]), reverse=True)
-    return {"fetched_at": utc_now(), "fetched_unix": time.time(), "releases": releases}
+    return {
+        "source": "github-tags",
+        "fetched_at": utc_now(),
+        "fetched_unix": time.time(),
+        "releases": releases,
+    }
 
 
 def update_status(args):

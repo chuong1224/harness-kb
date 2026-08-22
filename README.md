@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.20.1-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.20.2-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
@@ -197,7 +197,7 @@ against, so the gate refuses to do it — even about itself.
 ### Build an agent-ready vault
 
 Clone this repository, then give the installer a clean target folder. The network choice is
-required rather than implied: `--allow-network-checks` records consent for cached GitHub release
+required rather than implied: `--allow-network-checks` records consent for cached GitHub SemVer-tag
 checks; use `--no-network-checks` for a permanently local install.
 
 ```bash
@@ -216,9 +216,10 @@ That creates no demo notes and copies no repository history. It creates:
 - an optional Claude hook file whose claim and audit state is explicitly namespaced inside this
   vault, never shared with another vault on the same machine.
 
-Run `python .harness/harness.py check .` at session start. A consented check uses a 24-hour
-per-vault cache, reports the exact number of stable releases you are behind, and exits quietly
-without an offline warning if the network is unavailable.
+Run `python .harness/harness.py check .` at session start. A consented check reads the stable
+SemVer tags that this repository actually publishes, uses a 24-hour per-vault cache, reports the
+exact number of releases you are behind, and exits quietly without an offline warning if the
+network is unavailable.
 
 Upgrade is deliberately two commands, so review exists before mutation:
 

@@ -114,15 +114,20 @@ def make_new_source(old_source, temp, forced_red=False):
     return source, commit_source(source, "Fixture release v1.21.0" + (" red" if forced_red else ""))
 
 
-class ReleaseHandler(http.server.BaseHTTPRequestHandler):
+class TagHandler(http.server.BaseHTTPRequestHandler):
     calls = 0
+    paths = []
 
     def do_GET(self):
         type(self).calls += 1
+        type(self).paths.append(self.path)
+        if not self.path.startswith("/repos/chuong1224/harness-kb/tags?per_page=100&page=1"):
+            self.send_error(404)
+            return
         payload = [
-            {"tag_name": "v1.22.0", "html_url": "https://example/v1.22.0", "zipball_url": "", "published_at": "2026-08-24", "draft": False, "prerelease": False},
-            {"tag_name": "v1.21.0", "html_url": "https://example/v1.21.0", "zipball_url": "", "published_at": "2026-08-23", "draft": False, "prerelease": False},
-            {"tag_name": "v%s" % BASE_VERSION, "html_url": "https://example/base", "zipball_url": "", "published_at": "2026-08-22", "draft": False, "prerelease": False},
+            {"name": "v1.22.0", "zipball_url": "https://example/v1.22.0.zip"},
+            {"name": "v1.21.0", "zipball_url": "https://example/v1.21.0.zip"},
+            {"name": "v%s" % BASE_VERSION, "zipball_url": "https://example/base.zip"},
         ]
         body = json.dumps(payload).encode("utf-8")
         self.send_response(200)
@@ -137,8 +142,9 @@ class ReleaseHandler(http.server.BaseHTTPRequestHandler):
 
 @contextlib.contextmanager
 def release_server():
-    ReleaseHandler.calls = 0
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), ReleaseHandler)
+    TagHandler.calls = 0
+    TagHandler.paths = []
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), TagHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -211,11 +217,21 @@ def main():
         disabled = run([sys.executable, vault2 / ".harness" / "harness.py", "check", vault2, "--api-base", "http://127.0.0.1:1", "--timeout", "0.2"])
         check("network is never contacted without recorded consent", disabled.returncode == 0 and b"disabled" in disabled.stdout.lower(), text(disabled))
 
+        legacy_cache = vault1 / ".harness" / "cache" / "releases.json"
+        legacy_cache.parent.mkdir(parents=True, exist_ok=True)
+        legacy_cache.write_text(
+            json.dumps({"fetched_unix": 4102444800, "releases": []}) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
         with release_server() as api:
             first = run([sys.executable, vault1 / ".harness" / "harness.py", "check", vault1, "--api-base", api, "--cache-seconds", "3600"])
             second = run([sys.executable, vault1 / ".harness" / "harness.py", "check", vault1, "--api-base", api, "--cache-seconds", "3600"])
             check("update delivery reports exact release distance", first.returncode == 0 and b"2 releases behind" in first.stdout, text(first))
-            check("successful update checks are cached per vault", ReleaseHandler.calls == 1 and second.returncode == 0, {"calls": ReleaseHandler.calls, "output": text(second)})
+            check("update delivery reads the repository's published SemVer tags", bool(TagHandler.paths) and all("/tags?" in path for path in TagHandler.paths), TagHandler.paths)
+            refreshed_cache = json.loads(legacy_cache.read_text(encoding="utf-8"))
+            check("legacy Release-object cache is invalidated", refreshed_cache.get("source") == "github-tags", refreshed_cache)
+            check("successful update checks are cached per vault", TagHandler.calls == 1 and second.returncode == 0, {"calls": TagHandler.calls, "output": text(second)})
         check("another vault did not inherit the first vault cache", not (vault2 / ".harness" / "cache" / "releases.json").exists())
 
         offline = run([

@@ -725,7 +725,7 @@ An installable harness therefore needs two closed loops of its own:
 | Loop | Evidence that closes it |
 |---|---|
 | **Bootstrap** | One explicit command creates a clean target with a multi-agent entrypoint, in-vault tooling and gates. A fresh agent follows the entrypoint and produces a green gate without copying demo notes or maintainer-private policy. |
-| **Lifecycle** | The target records source repository, installed version and exact commit, component ownership and base hashes; a consented cached check reports release distance; upgrade is plan-before-apply with backup, gates and rollback. |
+| **Lifecycle** | The target records source repository, installed version and exact commit, component ownership and base hashes; a consented cached check reads the repository's published stable SemVer tags and reports release distance; upgrade is plan-before-apply with backup, gates and rollback. |
 
 The ownership boundary is load-bearing. Human policy, local rules and agent instructions are
 **user-owned**: create them once and never overwrite or recreate them. Executable reference tooling
@@ -738,6 +738,8 @@ Network behavior is part of the product contract, not an implementation detail. 
 recorded, successful checks cached per vault, and an offline machine must keep working without a
 new red alarm merely because it is offline. State named only by hostname is not per-vault state:
 two vaults on one machine must not share their cache, ledger, baseline, plan, backup or identity.
+The checker must read the publication surface the maintainer really uses. If versions are shipped
+as Git tags, an empty GitHub Releases page is not evidence that no update exists.
 
 **Shipped here:** `examples/scripts/harness.py`, the declarative component list in
 `scaffold/release.json`, generic target entrypoints under `scaffold/`, and a black-box suite that

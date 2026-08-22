@@ -1,10 +1,11 @@
 {
   "schema_version": 1,
   "product": "harness-kb",
-  "version": "1.20.1",
+  "version": "1.20.2",
   "repository": "https://github.com/chuong1224/harness-kb",
   "default_cache_seconds": 86400,
   "migration_impact": [
+    "Update delivery reads the repository's stable SemVer tags, which are its actual publication surface; incompatible caches from the Release-object implementation are ignored.",
     "First install creates an in-vault .harness control plane; it never copies demo notes or private data.",
     "AGENTS.md, CLAUDE.md, .gitignore, .claude/settings.json and the vault rules are user-owned after creation and upgrades never overwrite or recreate them.",
     "Installed scripts are upstream-owned. A local edit becomes a visible plan conflict instead of being overwritten.",
