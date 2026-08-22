@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.4] - 2026-08-22
+
+### Fixed
+- **Files written by a scheduled routine on another machine no longer count as work a task did.**
+  A synchronized vault receives routine output mid-session; a routine `git add -A` then folds those
+  files into a commit labelled with the task in progress, so the task owns files nobody in that
+  session opened and the collision detector pairs it with every task that ever brushed the same log.
+  The ledger sieve cannot reach them: it discounts files that *every* task touches, while these three
+  logs sat at 14.6%, 14.6% and 16.7% of footprints — under the 30% threshold whose lower edge is
+  already pinned at 18.2% by a genuine tool. Routine-written files are now declared by name in the
+  project's counted-truth rules, each entry naming the routine that produces it.
+- The inspector fails open on a malformed declaration, because a measurement should not die of a
+  config error, so the rules checker fails closed in its place and turns red when a declared path no
+  longer exists. Without that pairing a single note rename would disable the sieve in silence.
+- Stated cost: a task that genuinely rewrites one of those notes loses its pairing signal on that
+  file, the same trade already accepted for ledger files. Before/after on one fixed tree reads 296
+  pairs to 282; because closing the task itself moves the denominator, the durable form is the
+  counterfactual — on a later tree, 352 with the sieve off against 338 with it on, the same
+  difference of 14.
+
 ## [1.20.3] - 2026-08-22
 
 ### Fixed
@@ -871,6 +891,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.4]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.4
 [1.20.3]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.3
 [1.20.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.2
 [1.20.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.1

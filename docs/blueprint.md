@@ -713,6 +713,42 @@ a table of every label shape the history actually contains. Without that set, th
 "improve" the parser has nothing telling them which improvements are regressions.
 
 
+### The files a machine writes are not evidence of what a person did
+
+The same attribution surface has a third leak, and it arrives from outside the repository
+altogether. A vault synchronized across two machines receives the output of scheduled routines that
+ran somewhere else: an audit report, two processing logs, a regenerated catalog. If that arrival
+lands mid-session, an ordinary `git add -A` sweeps those files into a commit whose subject carries
+the label of the task being worked on — and by every rule above, that commit *did* the task. The
+task now owns files no human in that session opened, and the collision detector pairs it with every
+task that ever brushed the same routine log.
+
+This is not the ledger problem restated. The ledger sieve removes files that *every* task touches;
+these files are touched *rarely*, by accident, and a frequency rule is structurally unable to see
+them. Measured on this project's real history, the three routine logs sat at 14.6%, 14.6% and 16.7%
+of task footprints, under a 30% ledger threshold whose lower edge was already pinned: below 18.2% it
+starts swallowing a genuine tool that a real task did edit. **Rarity is what makes them dangerous.**
+A file that appears in most footprints is caught and discounted; a file that appears in a handful is
+kept as distinctive evidence, and every appearance manufactures a false pair.
+
+So the third sieve is by name, not by statistics: the files a scheduled routine writes are declared
+in the rules the project already treats as its single source of counted truth, each entry naming the
+routine that produces it, and the inspector only reads that list. Two properties keep it honest. The
+consumer fails open — an inspector is a measurement, not a gate, and a malformed config should cost
+one sieve rather than the whole report — so the *rules* checker has to fail closed in its place, and
+turns red when a declared path no longer exists. Without that pairing, a single note rename would
+switch the sieve off in silence, which is the failure mode the whole section is about.
+
+The cost is stated rather than hidden: a task that genuinely rewrites one of those routine-written
+notes loses its pairing signal on that file. That is the same trade already accepted for ledger
+files, and it is the correct direction — a missing question is cheaper than a fabricated one.
+
+One more habit came out of the repair. The before/after figures — 296 pairs to 282 — are only
+reproducible on the tree they were taken on, because closing the very task that produced them adds a
+footprint and moves the denominator. The durable form is the counterfactual: run the current code
+with the sieve on and off against the *same* tree. On a later tree that reads 352 against 338 — a
+different pair of totals, the same difference of 14.
+
 ### A blueprint is not delivered until a consumer can install and evolve it
 
 A maintainer can have perfect SemVer, tags and release notes while every user remains stranded on
