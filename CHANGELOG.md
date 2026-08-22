@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.7] - 2026-08-22
+
+### Fixed
+- **The section published in 1.20.6 described the wrong home for one list.** It said the generated
+  files the commit-time gate watches are named in the project's declared source of counted truth;
+  in the implementation they are declared at the top of the gate itself. Post-release audit caught
+  the mismatch between the published account and the running system. The text now says where the
+  list actually lives, why it matches on basename rather than full path, and states the weakness
+  that placement leaves behind — a new generated artifact nobody adds to that list reproduces the
+  original incident exactly. Published tags are not amended, so this ships as a new patch.
+
 ## [1.20.6] - 2026-08-22
 
 ### Added
@@ -947,6 +958,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.7]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.7
 [1.20.6]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.6
 [1.20.5]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.5
 [1.20.4]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.4

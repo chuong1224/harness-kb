@@ -827,8 +827,11 @@ that keeps two agents from writing the same file at once records, per stream, wh
 stream has touched. That ledger answers the commit-time question directly: for each staged path, is
 there a record from a *different* stream and none from mine? The catalog case becomes a second rule
 in the same gate — generated data staged while its source notes remain modified-but-unstaged — and
-the derived file is named in the project's declared list of machine-written artifacts rather than
-hard-coded into the gate, so the list stays in one place.
+the derived files are recognised by name from a single list at the top of the gate, matched on
+basename rather than on full path so that renaming a directory cannot switch the rule off in
+silence. That list is the one thing here that is still declared inside the tool rather than in the
+project's source of counted truth, which is the honest place to note the remaining weakness: a new
+generated artifact that nobody adds to it reproduces the original incident exactly.
 
 Two design choices carry most of the value. First, the gate blocks only on positive evidence and
 *warns* when it cannot identify the current session at all — a plain terminal commit by a human, for
