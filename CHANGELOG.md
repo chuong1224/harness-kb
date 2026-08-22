@@ -4,6 +4,33 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.5] - 2026-08-22
+
+### Fixed
+- **Two tasks editing different functions of the same file are no longer reported as colliding.**
+  After the ledger and routine sieves, the collision detector still paired tasks whenever their
+  commits touched the same path, so the project's own work-registry tool — edited by thirteen
+  different tasks — produced 78 pairs on its own. That is not evidence of interference; it is
+  evidence that both tasks worked in this project. The unit of comparison is now a *region*: the
+  hunk heading git already computes, a function for source files and a section heading for notes.
+- **Regions are named, not numbered.** Line ranges from commits months apart are not comparable,
+  because the file has shifted underneath them; a function name or a section title survives that
+  drift. The cost is the mirror image: renaming a function or retitling a section severs the link
+  between an old task and a new one working in the same place, which file-level pairing did not do.
+- **Hunks confined to a note's YAML frontmatter are discarded.** Every note edit bumps its `updated:`
+  field, producing a headingless hunk at the top of the file; kept, it collapses the unit back to
+  whole-file and returns the measure to its starting point. Edits to the note *body* are unaffected.
+- Enabling git's builtin markdown diff driver is part of the fix, not an aside. Without it the
+  heading for a note is an arbitrary preceding line — measured here, every hunk of one large note
+  reported a line from inside a mermaid diagram. That attribute governs *diff* only and leaves the
+  repository's line-ending policy untouched. Nothing else in the test suite reads it, so a test
+  asserts the attribute file directly; losing that line would corrupt every note region while the
+  suite stayed green.
+- Measured on one fixed tree: 347 pairs to 254, and the work-registry tool from 78 to 31. The
+  smaller global drop is the honest result — most surviving pairs share a genuine region. Footprints
+  with no region data fall back to file-level pairing, so tasks closed before the project recorded
+  commit ids keep their old behaviour and the change is scoped to new work.
+
 ## [1.20.4] - 2026-08-22
 
 ### Fixed
@@ -891,6 +918,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.5]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.5
 [1.20.4]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.4
 [1.20.3]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.3
 [1.20.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.2

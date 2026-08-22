@@ -749,6 +749,51 @@ footprint and moves the denominator. The durable form is the counterfactual: run
 with the sieve on and off against the *same* tree. On a later tree that reads 352 against 338 — a
 different pair of totals, the same difference of 14.
 
+### The unit of a comparison decides what it can mean
+
+Three sieves later, the collision detector was still noisy, and the remaining noise was not a
+filtering failure at all. Its rule — *pair two tasks when their commits touch the same file* — makes
+the file the unit of comparison, and a file is far too coarse an object to carry that claim. This
+project's work-registry tool has been edited by thirteen separate tasks; the rule therefore asserted
+seventy-eight collisions among them. Every one of those assertions was formally correct and
+substantively empty. Two tasks editing different functions of the same module have not interfered
+with each other; they have merely both worked here.
+
+The repair is to shrink the unit until it can support the claim. Version control already computes a
+usable one: the hunk heading, which names the enclosing function for source files and the nearest
+section for notes. Pairing on `(file, region)` instead of `file` cut the work-registry tool's
+contribution from 78 pairs to 31, and the report as a whole from 347 to 254.
+
+**Name the region; do not number it.** Line ranges are the obvious encoding and the wrong one. Two
+commits months apart describe a file that has shifted underneath them, so their line numbers are not
+comparable and any overlap computed from them is an artefact of edit history rather than of subject
+matter. A function name or a section title is stable across that drift. The trade is exact and worth
+stating: renaming a function or retitling a section now severs the link between an old task and a
+new one working in the same place — a failure mode file-level pairing did not have, accepted because
+it errs toward a missing question rather than a fabricated one.
+
+**A unit is only as good as the parser that produces it.** For notes, the default heading heuristic
+picks an arbitrary preceding line; measured here, *every* hunk of one large note was labelled with a
+line from inside a mermaid diagram. Enabling the builtin markdown diff driver fixes it, which makes
+a repository attribute file a load-bearing dependency of a measurement — and one that no test
+otherwise reads. Lose that line and every note region turns to noise while the suite stays green, so
+a test asserts the attribute file directly. This is the same shape as the sieve that fails open
+needing a checker that fails closed: whenever correctness depends on configuration living outside
+the code, something has to fail loudly when the configuration drifts.
+
+**Bookkeeping fields defeat fine units unless removed.** Every note edit bumps an `updated:` field
+in its frontmatter, which produces a headingless hunk at the top of the file. Left in, that hunk
+degrades the unit back to whole-file for any note, and the finer measure quietly reverts to the
+coarse one it replaced. Discarding hunks confined to frontmatter recovered the difference — 280
+pairs to 254 — and edits to the note body are untouched. The general lesson is that a per-record
+timestamp is the natural enemy of any measure defined over *what changed*.
+
+Finally, the change is scoped by what the data can support rather than applied uniformly. Most
+closed tasks here predate the practice of recording a commit id, so there is nothing to read regions
+from; those footprints fall back to file-level pairing rather than vanishing. A refinement that
+requires richer evidence should degrade to the older, coarser answer for records that lack it — not
+silently drop them, and not pretend to a precision the data never had.
+
 ### A blueprint is not delivered until a consumer can install and evolve it
 
 A maintainer can have perfect SemVer, tags and release notes while every user remains stranded on
