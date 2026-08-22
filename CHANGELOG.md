@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.3] - 2026-08-22
+
+### Fixed
+- **Accepting audit debt in one vault can no longer silence another vault on the same machine.**
+  The audit gate's default baseline was keyed only by hostname. Two vaults using the same cache
+  therefore shared findings, fingerprints and `accept --why` decisions even though the baseline
+  lived outside both vaults. Default state filenames now include a stable 16-hex hash of the
+  canonical, filesystem-normalized vault root without exposing that path.
+- Explicit `--state` and `AUDIT_GATE_STATE` paths still mean intentional sharing. Ambiguous
+  hostname-only baselines are deliberately not migrated; each vault establishes a fresh baseline
+  on its first run. A black-box regression runs two vaults through one cache, accepts the same
+  finding in vault A, and proves vault B still blocks. The two new assertions fail on 1.20.2.
+
 ## [1.20.2] - 2026-08-22
 
 ### Fixed
@@ -858,6 +871,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.3]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.3
 [1.20.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.2
 [1.20.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.1
 [1.20.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.0

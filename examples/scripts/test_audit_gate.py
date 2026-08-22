@@ -20,6 +20,7 @@ The cases aim at the ways this guard could be *harmful* rather than the happy pa
   * a bad --vault reports an error instead of reporting "clean" and writing a false
     baseline;
   * `paths` keeps an expensive gate off the critical path until its files change.
+  * two vaults using the same machine cache never share a baseline or an accepted finding.
 """
 
 from __future__ import annotations
@@ -91,7 +92,7 @@ def build_vault(root: Path) -> None:
     (root / "gates.json").write_text(json.dumps(CONFIG, indent=1), encoding="utf-8")
 
 
-def run(vault: Path, state: Path, *args, payload=None, env=None, raw=None):
+def run(vault: Path, state: Path | None, *args, payload=None, env=None, raw=None):
     e = dict(os.environ)
     e.pop("AUDIT_GATE_OFF", None)
     for k in list(e):
@@ -100,8 +101,10 @@ def run(vault: Path, state: Path, *args, payload=None, env=None, raw=None):
     e.update(env or {})
     data = raw if raw is not None else json.dumps(payload or {}).encode("utf-8")
     cwd = vault if vault.is_dir() else HERE
-    p = subprocess.run([sys.executable, "-B", str(GATE), *args,
-                        "--vault", str(vault), "--state", str(state)],
+    argv = [sys.executable, "-B", str(GATE), *args, "--vault", str(vault)]
+    if state is not None:
+        argv += ["--state", str(state)]
+    p = subprocess.run(argv,
                        input=data, capture_output=True, cwd=str(cwd), env=e)
     out = (p.stdout or b"").decode("utf-8", "replace") + (p.stderr or b"").decode("utf-8", "replace")
     return p.returncode, out
@@ -226,6 +229,30 @@ def main() -> int:
         check("default config runs clean on examples/demo-vault", code == 0, "exit=%d" % code)
         check("both default gates actually ran",
               "integrity" in out and "rules-drift" in out)
+
+        print("\n14. default state is namespaced by vault, not only by hostname")
+        vault_a, vault_b = tmp / "namespace-a", tmp / "namespace-b"
+        build_vault(vault_a)
+        build_vault(vault_b)
+        cache = tmp / "default-cache"
+        cache_env = {"LOCALAPPDATA": str(cache)}
+        code_a, out_a = run(vault_a, None, "run", env=cache_env)
+        code_b, out_b = run(vault_b, None, "run", env=cache_env)
+        states = sorted((cache / "audit-gate").glob("state-*.json"))
+        check("two vaults create two default baseline files",
+              code_a == 0 and code_b == 0 and len(states) == 2,
+              "states=%d" % len(states))
+
+        touch(vault_a / "notes" / "a.md", "# namespace a changed\n")
+        shared_finding = dict(cache_env, STUB_INTEGRITY="same finding in either vault")
+        code, out = run(vault_a, None, "accept", "--why", "owned by vault A",
+                        env=shared_finding)
+        check("vault A can accept its own finding", code == 0, "exit=%d" % code)
+        touch(vault_b / "notes" / "a.md", "# namespace b changed\n")
+        code, out = run(vault_b, None, "hook-stop", payload={"cwd": str(vault_b)},
+                        env=shared_finding)
+        check("vault A acceptance cannot silence vault B",
+              code == 2 and "same finding" in out, "exit=%d" % code)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

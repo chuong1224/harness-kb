@@ -65,9 +65,13 @@ SPEED. The quiet path is a fingerprint (mtime+size) of the vault, so a turn that
 nothing costs a fraction of a second and starts no subprocess. `paths` keeps expensive
 suites off the critical path until the files they cover actually change.
 
-The baseline lives per machine, outside the vault (`%LOCALAPPDATA%` / `~/.cache`): two
-machines have different rhythms, and a state file inside a cloud-synced vault is a
-conflict-copy generator. Losing it costs one redundant run and never a wrong answer.
+The baseline lives per machine **and per vault**, outside the vault (`%LOCALAPPDATA%` /
+`~/.cache`): two machines have different rhythms, while two vaults on one machine must
+not share accepted findings. The filename includes a stable hash of the canonical vault
+root without exposing that path. An explicit `--state` / `AUDIT_GATE_STATE` still means
+intentional sharing. Ambiguous hostname-only files are not migrated; each vault establishes
+a fresh baseline. Keeping state outside a cloud-synced vault avoids conflict copies, and
+losing it costs one redundant run rather than a wrong answer.
 
     audit_gate.py run [--force]         run the gates; exit 1 if anything is new
     audit_gate.py hook-stop             Stop hook: reads payload on stdin, exit 2 blocks
@@ -84,6 +88,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -128,7 +133,17 @@ def find_vault(start: Path, marker: str = ".obsidian"):
     return None
 
 
-def state_path(explicit: str = "") -> Path:
+def _vault_key(vault: Path) -> str:
+    """Stable, filesystem-aware namespace without exposing the vault path in a filename."""
+    try:
+        root = os.path.normcase(str(vault.resolve()))
+    except (OSError, RuntimeError):
+        root = os.path.normcase(os.path.abspath(os.fspath(vault)))
+    return hashlib.sha256(root.encode("utf-8")).hexdigest()[:16]
+
+
+def state_path(vault: Path, explicit: str = "") -> Path:
+    """Per-machine, per-vault cache unless the caller explicitly chooses a shared path."""
     if explicit:
         return Path(explicit)
     env = os.environ.get("AUDIT_GATE_STATE")
@@ -136,7 +151,7 @@ def state_path(explicit: str = "") -> Path:
         return Path(env)
     base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_CACHE_HOME") \
         or os.path.join(os.path.expanduser("~"), ".cache")
-    return Path(base) / "audit-gate" / ("state-%s.json" % HOST)
+    return Path(base) / "audit-gate" / ("state-%s-%s.json" % (HOST, _vault_key(vault)))
 
 
 def gate_off() -> bool:
@@ -412,7 +427,7 @@ def run_gates(cfg: dict, base: Path, vault: Path, changed: list, first_run: bool
 # --------------------------------------------------------------------- commands
 
 def evaluate(args, vault: Path, quiet: bool) -> dict:
-    sp = state_path(args.state)
+    sp = state_path(vault, args.state)
     st = load_state(sp)
     cfg, base = load_config(vault, args.config)
     cur = fingerprint(vault)
@@ -534,7 +549,7 @@ def cmd_hook_stop(args) -> int:
 
 
 def cmd_status(args, vault: Path) -> int:
-    sp = state_path(args.state)
+    sp = state_path(vault, args.state)
     st = load_state(sp)
     cfg, _base = load_config(vault, args.config)
     changed = changed_paths(fingerprint(vault), st.get("signature"))
@@ -567,7 +582,7 @@ def cmd_accept(args, vault: Path) -> int:
         print('ERROR: --why "reason" is required. Adopting findings without recording why '
               'is how a gate dies while still looking alive.', file=sys.stderr)
         return 2
-    sp = state_path(args.state)
+    sp = state_path(vault, args.state)
     st = load_state(sp)
     cfg, base = load_config(vault, args.config)
     keys, _, not_run = run_gates(cfg, base, vault, [], True, args.timeout, 0, quiet=args.json)
@@ -587,7 +602,7 @@ def cmd_accept(args, vault: Path) -> int:
 
 
 def cmd_forget(args, vault: Path) -> int:
-    sp = state_path(args.state)
+    sp = state_path(vault, args.state)
     try:
         sp.unlink()
         print("Baseline dropped: %s" % sp)

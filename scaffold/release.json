@@ -1,10 +1,11 @@
 {
   "schema_version": 1,
   "product": "harness-kb",
-  "version": "1.20.2",
+  "version": "1.20.3",
   "repository": "https://github.com/chuong1224/harness-kb",
   "default_cache_seconds": 86400,
   "migration_impact": [
+    "The audit gate's default machine cache is namespaced by a stable hash of the canonical vault root; hostname-only baseline files are not migrated, and each vault establishes a fresh baseline.",
     "Update delivery reads the repository's stable SemVer tags, which are its actual publication surface; incompatible caches from the Release-object implementation are ignored.",
     "First install creates an in-vault .harness control plane; it never copies demo notes or private data.",
     "AGENTS.md, CLAUDE.md, .gitignore, .claude/settings.json and the vault rules are user-owned after creation and upgrades never overwrite or recreate them.",

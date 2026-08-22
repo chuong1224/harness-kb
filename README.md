@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.20.2-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.20.3-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
@@ -305,7 +305,9 @@ it is **not blocking too much**. A guard that jails a session over a red lamp so
 switched off within the week, so this one compares the *set of findings* against a stored baseline
 and blocks only on what is new. Inherited findings are printed on every run but never block, and a
 finding that genuinely is not yours is adopted with a recorded reason — `accept --why "…"` — rather
-than by disabling the guard.
+than by disabling the guard. Its default machine-local baseline is also namespaced by a stable hash
+of the canonical vault root, so accepting debt in one vault cannot silence the same finding in a
+second vault on that machine. An explicit `--state` path still means intentional sharing.
 
 `auto_fix.py` is the only script here that writes to your notes, and it is deliberately the
 narrowest one: it rewrites a **number on a line that carries a marker**, nothing else. It refuses
