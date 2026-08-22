@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.1] - 2026-08-22
+
+### Fixed
+- **A commit that talks about a task is no longer a commit of that task.** 1.19.1 published the
+  defect without a repair: attribution searched the whole commit message for a task identifier, so
+  every dossier entry, postmortem and audit note that named a task quietly enlarged that task's
+  footprint — and writing a finding down changed the very measurement being reported. Attribution
+  now reads only the subject's label, everything before the first colon and at most 60 characters.
+  An identifier in the label means the commit did the work; the same identifier mid-sentence or in
+  the body means the commit only discusses it.
+- Nothing real is lost by the narrower rule: the commit that actually closes a task is recorded in
+  the work registry at closing time, so a narrative subject carrying no label still reaches the
+  footprint by that route. The rule also matches the convention the history already follows, so no
+  past commit was rewritten.
+- Measured on one fixed tree: 321 attributed commits fall to 88 and crossing pairs from 970 to 261,
+  and the task the 1.19.1 finding was about returns to the single commit that carries it. The
+  counter-test the finding asked for is in place — one message naming five identifiers stays out of
+  all five footprints — beside a body-mention case, a real work commit, a registry-recorded hash
+  with no label, and a table of every label shape the history contains.
+
 ## [1.20.0] - 2026-08-22
 
 ### Added
@@ -822,6 +842,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.1
 [1.20.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.0
 [1.19.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.2
 [1.19.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.19.1

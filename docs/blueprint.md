@@ -677,8 +677,8 @@ files became four, and the 139-pair gap being reported evaporated because it had
 
 Two things follow. The narrow one: figures measured against a mutable attribution rule need the
 commit range they were taken at, or they are not reproducible, and a later reader re-running them
-will conclude the report was wrong rather than that the ground moved. The broad one is worse and is
-still open in our system: **every** write-up, postmortem, and audit note that names a task quietly
+will conclude the report was wrong rather than that the ground moved. The broad one is worse and went
+unrepaired for a day after it was written down: **every** write-up, postmortem, and audit note that names a task quietly
 enlarges that task's footprint. The foundational tasks — the ones everything else cites — accumulate
 files they never touched and collide with everything, which is the same false-alarm spiral the
 oversized-commit threshold was invented to stop, arriving by a different road. The repair has to
@@ -691,6 +691,27 @@ The general form, which is not specific to git: **when your analysis tool attrib
 text that you also write, your write-up is one of its inputs.** Any observer that reads the record it
 is also recorded in has this problem, and the only defences are to exclude your own reporting from
 the attribution, or to pin the measurement to a stated point in the record's history.
+
+The repair we shipped takes the first defence. Attribution now reads only the **label** of a commit
+subject — everything up to the first colon, capped at 60 characters — and ignores the body entirely.
+An identifier inside the label means the commit *did* the task; the same identifier mid-sentence or
+in the body means the commit merely *discusses* it, and no longer claims the commit. Measured on one
+fixed tree, this cut attribution from 321 commit assignments to 88 and crossing pairs from 970 to
+261, and restored the reported task to the single commit that actually carries it.
+
+Two properties made the rule cheap enough to adopt. It reads a convention the history already
+follows, so no past commit had to be rewritten and no future one has to be written differently. And
+what it drops is covered elsewhere: the commit that truly closes a task is recorded in the registry
+when the task is closed, so a narrative subject that never carries a label still reaches the
+footprint by the other road. A rule that both narrows attribution and has a second source for the
+narrowed cases can afford to be strict.
+
+The test that matters is the adversarial one the finding itself asked for: one commit naming five
+different identifiers must not become a commit of all five. Alongside it sit a body-mention case, a
+real work commit that must survive, a registry-recorded hash that must survive without a label, and
+a table of every label shape the history actually contains. Without that set, the next person to
+"improve" the parser has nothing telling them which improvements are regressions.
+
 
 ### A blueprint is not delivered until a consumer can install and evolve it
 
