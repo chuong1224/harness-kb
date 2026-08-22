@@ -794,6 +794,65 @@ from; those footprints fall back to file-level pairing rather than vanishing. A 
 requires richer evidence should degrade to the older, coarser answer for records that lack it — not
 silently drop them, and not pretend to a precision the data never had.
 
+### Put the guard where the bad act happens, not where the bad data is made
+
+Three sections above treat mis-attribution as a *reading* problem: given a history that already
+mixes several agents' work into single commits, how should an inspector avoid inventing collisions?
+Each answer improved the measurement. None of them stopped the history from being written that way
+in the first place, and a fourth incident made the distinction concrete. One commit, labelled with
+the task its session was closing, also carried a complete audit round — opened and closed by a
+different agent on the same machine, minutes earlier, inside the same eight-minute window. Nothing
+was lost and the registries stayed consistent. What was wrong was the claim: `git show` on that
+commit attributes an entire inspection to the session that merely happened to type `git add -A`
+next.
+
+The same shape has a second face that has nothing to do with agents. A catalog generated *from the
+notes on disk* was committed while several of those notes were still uncommitted, so the repository
+held a cover describing content it did not contain. Derived data had overtaken its own source. In
+the observed case the contradiction lasted seven minutes because someone else happened to commit the
+notes shortly after; had nobody done so, it would have stood indefinitely, and a retrospective
+inspector reading that commit would have been reading a description of nothing.
+
+Both faces suggest tempting fixes at the wrong end of the pipeline. For the catalog, the obvious one
+is to make the *generator* warn when its inputs are dirty. It is wrong for a structural reason worth
+stating plainly: the generator is not where the damage occurs. A build over a dirty tree is
+perfectly legitimate — the file it writes is a scratch artifact until someone commits it — and a
+warning printed at build time has scrolled off the screen by the time the commit is typed, possibly
+in another session entirely. The harmful act is *the commit*, so the guard belongs at commit time.
+The same reasoning disqualifies "forbid committing the catalog alongside other work": it fixes one
+filename while the actual radius is `git add -A` in any multi-stream workspace.
+
+What replaced them is a pre-commit gate reading evidence that already existed. The mechanical lock
+that keeps two agents from writing the same file at once records, per stream, which files that
+stream has touched. That ledger answers the commit-time question directly: for each staged path, is
+there a record from a *different* stream and none from mine? The catalog case becomes a second rule
+in the same gate — generated data staged while its source notes remain modified-but-unstaged — and
+the derived file is named in the project's declared list of machine-written artifacts rather than
+hard-coded into the gate, so the list stays in one place.
+
+Two design choices carry most of the value. First, the gate blocks only on positive evidence and
+*warns* when it cannot identify the current session at all — a plain terminal commit by a human, for
+instance. A gate that blocks a legitimate commit on a guess teaches people to remove the hook, which
+costs far more than the cases it would have caught. Second, a rule that only forbids is
+half-delivered: alongside the gate there is now a commit command that stages exactly what the
+current stream touched, so the correct path is shorter than the dangerous one. Prohibition without a
+convenient alternative is how `git add -A` won in the first place.
+
+The limits are stated rather than discovered later. The ledger only sees files written through the
+agent's own file-editing tools; anything changed by a script or by hand is invisible to it and must
+be declared explicitly on the commit command. Claims are garbage-collected after a day, so a commit
+that lags far behind its edits loses the evidence. And the two commit-time rules cannot make two
+sessions commit independently — one repository has one index and one HEAD. The achievable goal was
+never isolation; it was that each commit claims only what its own session did, and that other
+sessions' work be left on disk for them to commit themselves.
+
+One incident deserves recording for its shape rather than its content. The first real run of the new
+commit command printed a single output stream, which happened to be the one git's own summary uses —
+so the pre-commit gate ran with nothing visible on screen at all. A guard whose output is swallowed
+by its caller is indistinguishable from a guard that is not installed. It was found only because the
+run was checked with a deliberately empty probe commit, and it is now held by a test asserting the
+command echoes what it wrapped.
+
 ### A blueprint is not delivered until a consumer can install and evolve it
 
 A maintainer can have perfect SemVer, tags and release notes while every user remains stranded on

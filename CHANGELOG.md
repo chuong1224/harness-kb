@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.6] - 2026-08-22
+
+### Added
+- **A blueprint section on where a guard belongs: at the act, not at the artifact.** Three earlier
+  sections treat mis-attribution as a reading problem — how an inspector should avoid inventing
+  collisions from a history that already mixes several agents into one commit. A fourth incident
+  showed the writing side: one commit, labelled with the task its session was closing, also carried
+  a complete audit round opened and closed minutes earlier by a different agent on the same machine.
+  Nothing was lost; the claim was simply false.
+- **The same shape without agents: derived data overtaking its own source.** A catalog generated
+  from the notes on disk was committed while several of those notes were still uncommitted, leaving
+  the repository holding a cover for content it did not contain. The contradiction lasted seven
+  minutes only because someone else committed the notes shortly after.
+- **Why the tempting fix — warn in the generator — is at the wrong end.** A build over a dirty tree
+  is legitimate, and a warning printed at build time has scrolled away by the time the commit is
+  typed, possibly in another session. The harmful act is the commit, so the guard belongs there;
+  the same reasoning rejects forbidding one filename when the radius is `git add -A` in any
+  multi-stream workspace.
+- **The two design choices that carry the value.** The gate blocks only on positive evidence and
+  merely warns when it cannot identify the current session, because a gate that blocks legitimate
+  work on a guess teaches people to remove it. And prohibition ships with an alternative — a commit
+  command that stages exactly what the current stream touched — since a rule that only forbids is
+  how `git add -A` won in the first place.
+- **Stated limits, and one incident recorded for its shape.** The evidence ledger sees only files
+  written through the agent's editing tools, claims expire after a day, and one repository still has
+  one index and one HEAD — isolation was never the goal. The first real run of the new command
+  printed a single output stream and so swallowed the gate's own output entirely: a guard whose
+  output its caller discards is indistinguishable from one that is not installed.
+
 ## [1.20.5] - 2026-08-22
 
 ### Fixed
@@ -918,6 +947,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.6]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.6
 [1.20.5]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.5
 [1.20.4]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.4
 [1.20.3]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.3
