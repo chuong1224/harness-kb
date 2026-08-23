@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.8] - 2026-08-23
+
+### Added
+- **A blueprint section on the difference between choosing a version number and being allocated
+  one.** A release process can fully specify how to pick patch/minor/major and still leave unsaid
+  who hands out the number. Two sessions working the same repository in one afternoon both read the
+  current version from their own working copy, both picked the same successor, and the second one
+  wrote a duplicate changelog heading. Nothing was lost, and the repository's metadata gate caught
+  it — but only after both had written.
+- **Why reading the remote is necessary and not sufficient.** Querying the remote's tags closes
+  staleness; it does nothing about two sessions querying in the same second. What closes that is
+  treating allocation as a claim the server grants or refuses: branch and tag pushed atomically, so
+  a lost race rejects both refs before anything is visible. Pushing them separately risks the worse
+  outcome — a published tag on a commit that is not on the branch, which under a never-amend rule is
+  permanent debt.
+- **Two consequences of the same reasoning.** The base for the next number is always the remote's
+  newest tag, never a higher number found locally: that number means either an unpushed release or
+  the one this session just lost, and building on it silently skips a version for a release that
+  never existed. And when the remote is unreachable the tool stops instead of falling back to local
+  files, because a fallback that restores the exact behaviour the mechanism prevents is worse than
+  an outage.
+
 ## [1.20.7] - 2026-08-22
 
 ### Fixed
@@ -958,6 +980,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.8]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.8
 [1.20.7]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.7
 [1.20.6]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.6
 [1.20.5]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.5

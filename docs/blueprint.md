@@ -856,6 +856,51 @@ by its caller is indistinguishable from a guard that is not installed. It was fo
 run was checked with a deliberately empty probe commit, and it is now held by a test asserting the
 command echoes what it wrapped.
 
+### Choosing a number is not the same as being given one
+
+A release process can be fully specified about *how to choose* a version number — patch for a fix,
+minor for a compatible addition, major for a break — and still say nothing about who **allocates**
+it. The omission is invisible with one session at a time, because the previous number and the next
+one are never in doubt. It becomes visible the first afternoon two sessions work on the same
+repository at once. Both read the current version the only way the process describes: from the badge,
+the changelog heading and the tags **on their own working copy**. Both see the same number. Both pick
+the same successor. The one that pushes second writes a second changelog entry under a heading that
+already exists upstream.
+
+The observed incident cost nothing — the loser renumbered, the published branch stayed clean — and
+that is precisely why it is worth writing down. The repository's own metadata gate caught it, exit 1
+on *release entries are unique*, so the collision could never have been published in silence. But the
+gate fires **after both sessions have written**. It is a net under the mistake, not a mechanism
+against it, and a net that only ever catches the second writer teaches nothing about why the second
+writer was there.
+
+The fix separates two problems that look like one. The first is *staleness*: a file on disk cannot
+tell you what another machine published ten minutes ago. That is closed by reading the number from
+the one surface both sessions share — the remote's tags, queried directly rather than through a
+locally cached copy of them. The second is *simultaneity*: two sessions that query the remote in the
+same second still receive the same answer, and no amount of reading fixes that. Reading narrows the
+window; it cannot close it.
+
+What closes it is refusing to treat allocation as a decision at all, and treating it as a claim that
+the server either grants or refuses. The branch and the tag go up in a single atomic push. If the tag
+already exists — someone else claimed the number while this session was writing prose — or if the
+branch is no longer a fast-forward, **both refs are rejected together** and the loser learns
+immediately, before anything of theirs is visible to anyone. The alternative, pushing the tag and the
+branch as two commands, has a failure mode that is much worse than a duplicate heading: a published
+tag pointing at a commit that is not on the branch. Under a rule that published tags are never
+amended or deleted — the rule that makes tags trustworthy in the first place — that is permanent
+debt, created by a convenience.
+
+Two smaller decisions came out of the same reasoning. The base for the next number is *always* the
+remote's newest tag, never the highest number found locally, even though a local number that is
+higher looks like useful information. It has exactly two meanings — an unpushed release that should
+be pushed, or the number this session just lost and has not cleaned up — and silently building on it
+serves neither: in the second case it skips a number to make room for a release that never existed.
+So the tool names the condition and makes a human resolve it instead of guessing. And when the remote
+cannot be reached, the tool stops rather than falling back to the local files. A fallback that
+quietly restores the exact behaviour the mechanism exists to prevent is worse than an outage,
+because it is indistinguishable from success.
+
 ### A blueprint is not delivered until a consumer can install and evolve it
 
 A maintainer can have perfect SemVer, tags and release notes while every user remains stranded on
