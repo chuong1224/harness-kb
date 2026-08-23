@@ -901,6 +901,57 @@ cannot be reached, the tool stops rather than falling back to the local files. A
 quietly restores the exact behaviour the mechanism exists to prevent is worse than an outage,
 because it is indistinguishable from success.
 
+### A contract only binds the sessions that go through it
+
+The allocation mechanism above has a property worth naming, because it is easy to mistake for a
+guarantee: it works only when every session actually uses it. Typing the underlying push by hand
+bypasses it completely, and nothing anywhere notices. The same is true one step earlier in the
+lifecycle. A published repository checked out on two machines has a rule — pull before you edit —
+that lives as a sentence in a policy file and is enforced by nothing but memory.
+
+Both gaps had leaked, three times between them, and every leak had been caught **by accident**:
+someone verifying an unrelated claim happened to notice a working copy two commits behind a tag, or
+a badge advertising a version older than the newest published one. Measured before building
+anything, the real damage was zero: three incidents, all self-healed or cleaned up by hand, and
+across the full history of both working copies on that machine, zero merge commits and ten pulls
+that were all fast-forwards. There had never been a conflict. What had gone wrong was subtler and
+worse: work performed on a stale base, then *published* with numbers that described a state nobody
+else could see.
+
+That measurement is what decided the design. Weak evidence of harm does not justify a gate that
+blocks broadly; a guard that blocks legitimate work teaches people to remove it, which is how the
+previous guard in this document nearly died. So both fences split their behaviour by **evidence**,
+not by anxiety:
+
+| | Blocks | Warns only |
+|---|---|---|
+| Before editing | the remote branch is provably ahead of the local one, or the two have diverged | no remote ref recorded yet, the last fetch is older than a threshold, a rebase or merge is in progress, the hook is unconfigured |
+| Before pushing | a release tag travelling alone without its branch; a tag number already on the remote; a tag pointing outside the branch being pushed; deleting a published tag; a non-fast-forward or deletion of the main branch | the working tree's declared version disagrees with the tag being pushed |
+
+The commit-time gate deliberately performs **no network call**. A commit must stay fast and must
+work offline, so it reads the remote-tracking ref that a session-start command refreshes. The cost is
+stated rather than hidden: it is blind to a push that happened on the other machine since that
+refresh. That case belongs to the session-start command, which is why the fence does not replace it.
+
+The push-time gate needs no network call either, and that is the pleasant surprise of the design.
+Git hands a `pre-push` hook the full list of refs in the push together with the value the remote
+**just advertised** for each one. That is fresher than any cached ref on disk, and it answers the
+three questions that matter — does this tag already exist upstream, is the branch travelling with
+it, is this a fast-forward — from data already in hand.
+
+One negative result is worth publishing, because it saves the next person the same afternoon. The
+obvious instinct is to enforce this on the server, where nothing local can be bypassed. It cannot be
+done. The available repository rules — restricting creation, updates and deletion; linear history;
+required deployments, signatures, pull requests and status checks; blocking force pushes; code
+scanning, quality and coverage; restrictions on file paths, length, extensions and size — contain
+nothing that can express *"a tag must arrive in the same atomic push as a branch"* or *"a tag must
+point at a commit reachable from the default branch"*. The constraint is about the **relationship
+between two refs in one operation**, and the server-side vocabulary is per-ref. Local hooks are not
+the elegant choice here; they are the only one, and their weaknesses stay on the record: a fresh
+clone has no hooks until the session-start command installs them, and `--no-verify` walks past them.
+These fences raise the cost of the careless path. They do not stop a determined one, and a document
+that claimed otherwise would be selling something.
+
 ### A blueprint is not delivered until a consumer can install and evolve it
 
 A maintainer can have perfect SemVer, tags and release notes while every user remains stranded on

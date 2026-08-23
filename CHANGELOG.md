@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.9] - 2026-08-23
+
+### Added
+- **A blueprint section on why a contract only binds the sessions that go through it.** The
+  allocation mechanism shipped in 1.20.8 is bypassed entirely by typing the underlying push by
+  hand, and the rule "pull before you edit" on a repository checked out twice is enforced by
+  nothing but memory. Both gaps had leaked three times between them, and every leak was caught by
+  accident while someone verified an unrelated claim. Measured before building: zero real damage,
+  zero merge commits and ten fast-forward pulls across both working copies. That weak evidence is
+  what shaped the fences — each splits blocking from warning by what it can actually prove, since a
+  guard that blocks legitimate work is removed by the people it annoys. The section records the
+  commit-time gate's deliberate refusal to touch the network, the push-time gate's use of the ref
+  values the remote advertises to the hook, and one negative result worth publishing: no
+  server-side repository rule can express "a tag must arrive in the same atomic push as a branch"
+  or "a tag must point at a commit reachable from the default branch", because that vocabulary is
+  per-ref while the constraint is about two refs in one operation.
+
 ## [1.20.8] - 2026-08-23
 
 ### Added
@@ -980,6 +997,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.9]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.9
 [1.20.8]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.8
 [1.20.7]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.7
 [1.20.6]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.6
