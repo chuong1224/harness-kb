@@ -1,10 +1,11 @@
 {
   "schema_version": 1,
   "product": "harness-kb",
-  "version": "1.20.9",
+  "version": "1.20.10",
   "repository": "https://github.com/chuong1224/harness-kb",
   "default_cache_seconds": 86400,
   "migration_impact": [
+    "The tooling selfcheck's default machine cache is now namespaced by both the canonical vault root and the Python runtime; old vault-only marks are not migrated, and each interpreter establishes its own fresh green mark.",
     "The audit gate's default machine cache is namespaced by a stable hash of the canonical vault root; hostname-only baseline files are not migrated, and each vault establishes a fresh baseline.",
     "Update delivery reads the repository's stable SemVer tags, which are its actual publication surface; incompatible caches from the Release-object implementation are ignored.",
     "First install creates an in-vault .harness control plane; it never copies demo notes or private data.",

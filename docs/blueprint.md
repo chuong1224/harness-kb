@@ -257,8 +257,12 @@ usually has two inputs and only one of them travels with it:
 Machine-local is a location, not a namespace. If one copy of the tool can serve several vaults on
 the same host, key that outside state by the canonical vault root (or a stable hash of it), not by
 hostname alone. Otherwise a demo vault can inherit a real vault's failures and test names, and the
-next accepted or green demo run can overwrite the real coverage mark. An explicit `--state` remains
-an intentional escape hatch; the unsafe sharing must never be the default.
+next accepted or green demo run can overwrite the real coverage mark. Apply the same rule one level
+down when several Python runtimes can run the same gate: an interpreter with all libraries present
+must not stamp green for a venv that cannot import them. Key the default state by a stable runtime
+identity as well as the vault, and record that identity inside an explicitly shared state so a
+runtime change forces another measurement. An explicit `--state` remains an intentional escape
+hatch for location; it must not turn a green result from one interpreter into evidence for another.
 
 So the tool arrives on the second machine complete and runnable, and its memory arrives empty. Run
 it there and it does precisely what it was written to do: render the artifact from the state it can

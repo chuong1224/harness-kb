@@ -23,11 +23,13 @@ THE FIX. Two layers, and neither of them asks an agent to remember anything:
 
 "Changed" is mtime+size over every `attachments/*.py` (tools included: editing a tool
 invalidates yesterday's green run just as much as editing its test), compared against the
-fingerprint of the last GREEN run. That marker is a per-machine, per-vault cache kept
-OUTSIDE the vault: two machines edit at different times, and a marker inside a synced
-folder is one more file for the sync to conflict over. The default filename includes a
-hash of the canonical vault root, so two vaults on one host cannot read or overwrite each
-other's coverage mark. Losing the cache costs one redundant run and can never produce a
+fingerprint of the last GREEN run. That marker is a per-machine, per-vault,
+per-interpreter cache kept OUTSIDE the vault: two machines edit at different times, and a
+marker inside a synced folder is one more file for the sync to conflict over. The default
+filename includes hashes of the canonical vault root and the Python runtime, so neither
+two vaults nor two interpreters on one host can read or overwrite each other's coverage
+mark. An explicitly shared state still stores the runtime fingerprint and reruns when the
+interpreter changes. Losing the cache costs one redundant run and can never produce a
 wrong answer.
 
 THREE SAFETY RULES, each learned the hard way:
@@ -144,8 +146,34 @@ def _vault_key(vault: Path) -> str:
     return hashlib.sha256(root.encode("utf-8")).hexdigest()[:16]
 
 
+def runtime_fingerprint() -> dict:
+    """Identity of the Python ACTUALLY running the gate, kept only in outside state."""
+    def canonical(path) -> str:
+        try:
+            return os.path.normcase(str(Path(path).resolve()))
+        except (OSError, RuntimeError, ValueError):
+            return os.path.normcase(os.path.abspath(os.fspath(path)))
+
+    impl = getattr(sys, "implementation", None)
+    return {
+        "executable": canonical(sys.executable),
+        "prefix": canonical(sys.prefix),
+        "base_prefix": canonical(getattr(sys, "base_prefix", sys.prefix)),
+        "implementation": getattr(impl, "name", "python"),
+        "cache_tag": getattr(impl, "cache_tag", ""),
+        "version": list(sys.version_info[:3]),
+    }
+
+
+def _interpreter_key() -> str:
+    """Stable short namespace that does not expose the interpreter path in a filename."""
+    raw = json.dumps(runtime_fingerprint(), ensure_ascii=True, sort_keys=True,
+                     separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
 def state_path(vault: Path, explicit: str = "") -> Path:
-    """Per-machine, per-vault cache outside the vault (see module docstring)."""
+    """Per-machine, per-vault, per-interpreter cache outside the vault."""
     if explicit:
         return Path(explicit)
     env = os.environ.get("KB_TOOLING_STATE")
@@ -154,7 +182,7 @@ def state_path(vault: Path, explicit: str = "") -> Path:
     base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_CACHE_HOME") \
         or os.path.join(os.path.expanduser("~"), ".cache")
     return Path(base) / "kb-tooling-selfcheck" / (
-        "state-%s-%s.json" % (HOST, _vault_key(vault)))
+        "state-%s-%s-%s.json" % (HOST, _vault_key(vault), _interpreter_key()))
 
 
 def gate_off() -> bool:
@@ -229,6 +257,12 @@ def stale(vault: Path, path: Path):
     old = st.get("signature")
     if not isinstance(old, dict) or not old:
         return True, "no green run recorded on this machine yet"
+    runtime_old = st.get("runtime")
+    runtime_now = runtime_fingerprint()
+    if runtime_old != runtime_now:
+        if not isinstance(runtime_old, dict):
+            return True, "the old green mark has no interpreter fingerprint"
+        return True, "the interpreter running the gate changed"
     cur = signature(vault)
     if cur == old:
         return False, "nothing changed since the green run of %s" % (
@@ -582,11 +616,13 @@ def cmd_run(args, vault: Path, details=None) -> int:
             if not args.json:
                 print("No suites found (%s/**/attachments/test_*.py)." % vault.name)
             save_state(sp, {"last_ok": time.time(), "host": HOST, "tests": 0,
+                            "runtime": runtime_fingerprint(),
                             "signature": signature(vault)})
             return 0
         if clean and not mute and (not (dropped or vanished) or reason):
             mark = {"last_ok": time.time(), "host": HOST, "tests": len(results),
                     "skipped": skipped_items, "counts": counts,
+                    "runtime": runtime_fingerprint(),
                     "signature": signature(vault)}
             if reason and (dropped or vanished):
                 # Lowering the mark is a deliberate act and must leave a trace: a mark that

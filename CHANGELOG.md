@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.10] - 2026-08-26
+
+### Fixed
+- **A green tooling mark can no longer cross Python interpreters on the same host and vault.**
+  The default marker was already isolated by machine and canonical vault root, but two agents
+  running different Python executables still shared it. A fully provisioned interpreter could
+  therefore stamp green; a venv missing a library could later take the `--if-stale` fast path and
+  skip the very run that would have exposed the broken measurement. The default filename now also
+  includes a stable, non-revealing hash of the runtime identity. Explicit `--state` and
+  `KB_TOOLING_STATE` remain deliberate location overrides, but the state records its interpreter
+  fingerprint and becomes stale when that runtime changes.
+- **Three break-the-gate assertions cover the boundary.** They model two interpreter identities
+  on one host and vault, prove that their default markers differ, prove the namespace is stable
+  without exposing either runtime path, and prove an explicitly shared state still reruns after an
+  interpreter change. On the previous release, the separation and shared-state assertions fail;
+  the complete tooling-selfcheck suite now passes 55/55.
+
 ## [1.20.9] - 2026-08-23
 
 ### Added
@@ -997,6 +1014,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.10]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.10
 [1.20.9]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.9
 [1.20.8]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.8
 [1.20.7]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.7

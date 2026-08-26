@@ -14,6 +14,7 @@ Run:   python examples/scripts/test_tooling_selfcheck.py
 Exit:  0 = all cases pass, 1 = at least one failed
 """
 
+import importlib.util
 import json
 import os
 import shutil
@@ -468,6 +469,53 @@ def main() -> int:
         report("52. the two vaults keep separate default markers",
                len(marks_after) == 2 and marks_before < marks_after,
                "before=%r after=%r" % (marks_before, marks_after))
+
+        # --- one vault, two interpreters -----------------------------------------
+        # A host+vault namespace still lets a full Python stamp green for a different
+        # Python that lacks a library. Model two interpreter identities directly so the
+        # regression stays deterministic on machines that only have one Python installed.
+        spec_runtime = importlib.util.spec_from_file_location("gate_runtime", SCRIPT)
+        gate_runtime = importlib.util.module_from_spec(spec_runtime)
+        spec_runtime.loader.exec_module(gate_runtime)
+        executable_old = gate_runtime.sys.executable
+        prefix_old = gate_runtime.sys.prefix
+        try:
+            gate_runtime.sys.executable = str(tmp / "runtime-a" / "python.exe")
+            gate_runtime.sys.prefix = str(tmp / "runtime-a")
+            marker_a = gate_runtime.state_path(vault)
+            marker_a_again = gate_runtime.state_path(vault)
+            gate_runtime.sys.executable = str(tmp / "runtime-b" / "python.exe")
+            gate_runtime.sys.prefix = str(tmp / "runtime-b")
+            marker_b = gate_runtime.state_path(vault)
+        finally:
+            gate_runtime.sys.executable = executable_old
+            gate_runtime.sys.prefix = prefix_old
+        report("53. two interpreters on one host+vault keep separate default markers",
+               marker_a != marker_b, "A=%s\nB=%s" % (marker_a, marker_b))
+        report("54. the interpreter namespace is stable and does not expose its path",
+               marker_a == marker_a_again
+               and "runtime-a" not in marker_a.name.lower()
+               and "python.exe" not in marker_a.name.lower(), str(marker_a))
+
+        has_runtime_mark = hasattr(gate_runtime, "runtime_fingerprint")
+        shared = tmp / "shared-explicit-state.json"
+        if has_runtime_mark:
+            runtime_a = gate_runtime.runtime_fingerprint()
+            runtime_b = dict(runtime_a)
+            runtime_b["executable"] = str(tmp / "runtime-b" / "python.exe")
+            gate_runtime.save_state(shared, {"last_ok": time.time(),
+                                             "signature": {"fixture.py": [1, 1]},
+                                             "runtime": runtime_a})
+            runtime_fn_old = gate_runtime.runtime_fingerprint
+            try:
+                gate_runtime.runtime_fingerprint = lambda: runtime_b
+                should_run, reason = gate_runtime.stale(vault, shared)
+            finally:
+                gate_runtime.runtime_fingerprint = runtime_fn_old
+        else:
+            should_run, reason = False, "runtime fingerprint missing"
+        report("55. an explicitly shared state still reruns when the interpreter changes",
+               has_runtime_mark and should_run and "interpreter" in reason.lower(), reason)
     finally:
         wipe(tmp)
         vault = None
