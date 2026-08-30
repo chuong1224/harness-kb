@@ -382,6 +382,47 @@ quiet channel two earlier rounds were spent closing. And keep the trigger narrow
 the file extensions that the failure mode actually applies to, so an unrelated permission error is
 never dressed up in a diagnosis that does not fit it.
 
+### One negative reading of a probabilistic component is not a verdict
+
+Every gate above assumes the thing it measures answers the same way twice. Some parts of an agent
+system do not. Whether a model reaches for a particular skill, tool, or retrieval path on a given
+turn is a judgement it makes anew each time, and identical input can produce different answers. Point
+a binary check at that and you have built a coin flip with an audit trail.
+
+Ours was a deployment check. A skill had just been patched and re-uploaded to a target we can only
+inspect by hand, so the evidence of a correct rollout was a prompt that should make the model load
+that skill. It did not load. Tried again with real content attached: still did not load. Two negative
+readings, a version bump in recent history, an obvious story — the patch narrowed the skill's trigger
+surface — and a plan to ship another patch reversing it.
+
+The story was wrong, and one command was enough to say so: the skill file was **byte-identical**
+between the two versions. The release had changed two scripts and a marker; the text that decides
+when the skill is chosen had never been touched, so no regression was mechanically possible. Then
+seven runs against the same build: the same sentence loaded the skill on one attempt and not on the
+next, three of seven overall. Nothing was broken. The check had simply been reading a distribution as
+though it were a boolean.
+
+Three rules come out of it, and only the first is about probability.
+
+- **Check the artifact before you believe the behaviour.** A cheap deterministic measurement — is
+  the file even different? — outranks any number of behavioural readings, because it can falsify the
+  causal story outright. Reach for it first; it is usually seconds of work, and here it stood between
+  us and a release that fixed nothing.
+- **State the sample, not the outcome.** Evidence for a probabilistic step is "loaded on 2 of 3
+  attempts", never "passed". A record that hides the sample size invites the next reader to treat one
+  failure as a regression, which is exactly the trap. Note also that the two directions are not
+  symmetric: a negative control that fires the wrong path once has proven something, while a positive
+  case that fails once has proven nothing.
+- **Re-derive the input before blaming the system.** Our first two readings used a shortened form of
+  the documented prompt — an error in the instrument, not the subject. This is the same lesson as
+  *the code is broken* versus *the measurement is broken*, arriving from a direction where there is
+  no stack trace to warn you: nothing errors, you simply measured something adjacent to what you
+  meant and got a plausible answer back.
+
+The general shape: when a check straddles a non-deterministic boundary, it stops being a gate and
+becomes a sample. Keep it — sampling that boundary is still worth doing — but give it the vocabulary
+of a sample, and never let a single draw from it authorise a change to the system it was watching.
+
 ### Parse the format with a real parser, or your gate will lie about it
 
 The same "quiet reassurance" failure has a second, sneakier source: a gate that *approximates* the

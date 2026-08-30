@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.11] - 2026-08-30
+
+### Added
+- **A blueprint section on checks that straddle a non-deterministic boundary.** Whether a model
+  reaches for a given skill or tool is decided anew each turn, so a pass/fail check pointed at that
+  decision is a coin flip with an audit trail. Ours read two negative attempts after a patch
+  release, inferred that the patch had narrowed the skill's trigger surface, and was one step from
+  shipping a second patch to reverse it. The cheap deterministic measurement settled it instead:
+  the skill file was byte-identical between the two releases, so no regression was mechanically
+  possible — the release had touched two scripts and a marker, never the text that decides when the
+  skill is chosen. Seven runs against the same build then had the same sentence loading the skill on
+  one attempt and not the next, three of seven overall. The section states the three rules that
+  follow: check the artifact before believing the behaviour, record the sample rather than an
+  outcome ("loaded on 2 of 3", never "passed"), and re-derive the input before blaming the subject —
+  our first two readings had quietly used a shortened form of the documented prompt, which is the
+  broken-measurement failure arriving with no stack trace to warn you. Also records the asymmetry
+  worth keeping: a negative control that fires once has proven something, a positive case that fails
+  once has proven nothing.
+
 ## [1.20.10] - 2026-08-26
 
 ### Fixed
@@ -1014,6 +1033,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.11]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.11
 [1.20.10]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.10
 [1.20.9]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.9
 [1.20.8]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.8
