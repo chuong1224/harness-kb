@@ -1030,6 +1030,60 @@ as Git tags, an empty GitHub Releases page is not evidence that no update exists
 installs two vaults, simulates newer releases, preserves user customization, forces conflicts and
 proves both automatic and manual rollback.
 
+### A registry of what you own must also record what you do not own
+
+The capability catalogue here passed every check it had while describing three of three hundred and
+thirty things. Three skills live in the knowledge base, are built from it and are deployed from it,
+and the catalogue held one rich record for each: trigger and guard, knowledge bindings, permissions,
+adapters, evaluation set, provenance. The inventory taken a week earlier had measured 330 capability
+instances across four runtimes — vendor plugin caches, a bundled skill catalogue, a local runtime
+tree, historical packages, two closed accounts. Nothing connected the two numbers, and nothing had
+to: a validator that only looks at the records present will call a catalogue of three complete
+forever. "Single source of truth" had quietly come to mean "we wrote down the parts we control."
+
+The repair is not to seize the other 327. It is to give every measured thing a **status**, and to
+make three of those statuses say *not ours*: `external` for a capability a vendor runtime owns and
+still exposes, `legacy` for one that only exists now as an archived or cached copy, `blocked` for
+one sitting behind a surface that refuses to report its own contents. Here that produced 285 records
+— 3 canonical, 185 external, 96 legacy, 1 blocked — and, more usefully, a gate: every record carries
+the instance ids it was derived from, the union of those ids is compared against the inventory, and
+the command exits non-zero if a single instance is unaccounted for. Coverage becomes a number a
+machine can refuse to accept, rather than a feeling.
+
+**`blocked` has to be a real status, not an omission.** Two of the measured targets are closed
+accounts whose contents could not be listed, versioned or hashed. The tempting moves are both wrong:
+drop them, and the catalogue claims a completeness it does not have; guess at their contents from
+what someone once said was stored there, and the catalogue asserts something no one measured. A
+record that says *this exists, here is the evidence we could not obtain, and here is why nothing may
+execute against it* is the only version of that row that stays true.
+
+**Write only what you measured, especially in the descriptive fields.** Each record in this schema
+demands intent, guards and an output contract — fields designed for capabilities the knowledge base
+authors. For 282 capabilities belonging to other people, the honest content of those fields is who
+owns it, where it was found, which host exposed it, and the standing rule that it may not be
+promoted to canonical. It is not a paraphrase of what a vendor's skill does. A registry that
+describes other people's software from imagination is worse than one that admits the gap, because
+the invention is indistinguishable from measurement once it is written down.
+
+**Generate the rows; do not hand-write them.** Three hundred records written by hand are a snapshot
+that begins drifting the moment the next inventory runs. Derived deterministically from the
+inventory, they can be rebuilt, diffed and gated, which turns "is the catalogue current?" into a
+command. The classification rules must then be total: every lifecycle value maps to a status, and an
+unrecognised one raises rather than defaulting, because a default here silently files an unknown
+thing as ordinary.
+
+The unit question from the earlier section returns in a new costume. Grouping by file would have
+counted twelve release archives and six deployed copies of the three owned skills as eighteen
+additional capabilities — a larger catalogue describing nothing more. Grouping by logical capability
+folds them back into the skill that produced them. The larger number was available and meaningless.
+
+One mechanical side effect is worth stating because it looks like a fault. The lock file hashes the
+whole registry, so expanding the catalogue from 30 KB to 1.6 MB changed the registry digest and the
+deployment doctor immediately reported drift. The lock simply had to be rewritten — and the useful
+detail is what did *not* change: the build's artifact generation hash was identical before and
+after, which is the proof that a hundredfold expansion of the descriptive layer touched none of the
+bytes that actually ship.
+
 ---
 
 ## 6. Roadmap: closing the loops

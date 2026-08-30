@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.12] - 2026-08-30
+
+### Added
+- **A blueprint section on catalogues that only record what you own.** Our capability catalogue held
+  three rich records — the three skills the knowledge base authors, builds and deploys — and passed
+  every check it had, while an inventory taken a week earlier had measured 330 capability instances
+  across vendor plugin caches, a bundled catalogue, a local runtime tree, historical packages and two
+  closed accounts. Nothing tied the two numbers together, so "single source of truth" had quietly
+  come to mean "the parts we control". The section states the repair: give every measured thing a
+  status, three of which say *not ours* (`external`, `legacy`, `blocked`), carry the instance ids each
+  record was derived from, and gate on the union of those ids against the inventory so coverage is a
+  number a machine can refuse. Here that is 285 records — 3 canonical, 185 external, 96 legacy, 1
+  blocked — covering all 330 instances exactly once. Also records the three rules that keep such a
+  catalogue honest: `blocked` must be a real row rather than an omission, since dropping a closed
+  target claims completeness and guessing its contents asserts what nobody measured; descriptive
+  fields for other people's software may say who owns it and where it was found but must not
+  paraphrase what it does; and the rows must be generated deterministically, with an unrecognised
+  lifecycle raising rather than defaulting. Closes with the mechanical side effect that looks like a
+  fault — expanding the catalogue changed the registry digest and the deployment doctor reported lock
+  drift, while the build's artifact generation hash stayed identical, which is what proves a
+  hundredfold expansion of the descriptive layer touched none of the shipped bytes.
+
 ## [1.20.11] - 2026-08-30
 
 ### Added
@@ -1033,6 +1055,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.20.12]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.12
 [1.20.11]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.11
 [1.20.10]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.10
 [1.20.9]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.9
