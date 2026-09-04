@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.1] - 2026-09-04
+
+### Added
+- A production case study on selecting tests for a bounded hook: reverse dependencies, full-run
+  fallbacks, preserving unexecuted suite baselines, and refusing to certify changing source.
+  The generic scaffold still runs its full suite set; the scoped-execution change is documentation-only.
+
+### Fixed
+- Lifecycle fixtures derive future release numbers from the current source version. A fixed
+  synthetic release had become older than the installed baseline, breaking update-distance and
+  upgrade checks after a version bump. Insert its changelog entry ahead of the current baseline.
+- Replace a production task identifier in an audit-gate usage example with a generic placeholder.
+
 ## [1.21.0] - 2026-09-04
 
 ### Added
@@ -1077,6 +1090,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.21.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.1
 [1.21.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.0
 [1.20.12]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.12
 [1.20.11]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.11

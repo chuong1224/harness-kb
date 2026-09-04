@@ -19,6 +19,10 @@ ROOT = Path(__file__).resolve().parents[2]
 # a literal turns every release into a test edit, and the edit that is forgotten reads as
 # a lifecycle bug rather than as a stale fixture.
 BASE_VERSION = json.loads((ROOT / "scaffold" / "release.json").read_text(encoding="utf-8"))["version"]
+# Synthetic releases must always be newer than the source under test.
+_base_major, _base_minor, _base_patch = map(int, BASE_VERSION.split("."))
+NEXT_VERSION = f"{_base_major}.{_base_minor + 1}.0"
+LATEST_VERSION = f"{_base_major}.{_base_minor + 2}.0"
 FAILURES = []
 ASSERTIONS = 0
 
@@ -83,7 +87,7 @@ def make_new_source(old_source, temp, forced_red=False):
     copy_repo(old_source, source)
     spec_path = source / "scaffold" / "release.json"
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
-    spec["version"] = "1.21.0"
+    spec["version"] = f"{NEXT_VERSION}"
     spec["migration_impact"] = ["Fixture migration: update one managed tool and add one tool."]
     if not forced_red:
         (source / "scaffold" / "new_tool.py").write_text(
@@ -93,9 +97,9 @@ def make_new_source(old_source, temp, forced_red=False):
             {"source": "scaffold/new_tool.py", "target": ".harness/scripts/new_tool.py", "ownership": "upstream"}
         )
         with (source / "examples" / "scripts" / "generate_catalog.py").open("a", encoding="utf-8", newline="\n") as fh:
-            fh.write("\n# lifecycle fixture v1.21.0\n")
+            fh.write(f"\n# lifecycle fixture v{NEXT_VERSION}\n")
         with (source / "scaffold" / "AGENTS.md").open("a", encoding="utf-8", newline="\n") as fh:
-            fh.write("\nUpstream template guidance added in v1.21.0.\n")
+            fh.write(f"\nUpstream template guidance added in v{NEXT_VERSION}.\n")
     else:
         spec["gates"].append(
             {"name": "forced-red", "argv": ["{python}", "-c", "raise SystemExit(7)"], "timeout": 10}
@@ -103,15 +107,15 @@ def make_new_source(old_source, temp, forced_red=False):
     spec_path.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8", newline="\n")
     changelog = source / "CHANGELOG.md"
     old = changelog.read_text(encoding="utf-8")
-    marker = "## [1.19.2]"
+    marker = f"## [{BASE_VERSION}]"
     entry = (
-        "## [1.21.0] - 2026-08-22\n\n### Added\n"
+        f"## [{NEXT_VERSION}] - 2026-08-22\n\n### Added\n"
         "- Fixture lifecycle release used by the black-box upgrade test.\n\n"
     )
     old = old.replace(marker, entry + marker, 1)
-    old += "\n[1.21.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.0\n"
+    old += f"\n[{NEXT_VERSION}]: https://github.com/chuong1224/harness-kb/releases/tag/v{NEXT_VERSION}\n"
     changelog.write_text(old, encoding="utf-8", newline="\n")
-    return source, commit_source(source, "Fixture release v1.21.0" + (" red" if forced_red else ""))
+    return source, commit_source(source, f"Fixture release v{NEXT_VERSION}" + (" red" if forced_red else ""))
 
 
 class TagHandler(http.server.BaseHTTPRequestHandler):
@@ -125,8 +129,8 @@ class TagHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
             return
         payload = [
-            {"name": "v1.22.0", "zipball_url": "https://example/v1.22.0.zip"},
-            {"name": "v1.21.0", "zipball_url": "https://example/v1.21.0.zip"},
+            {"name": f"v{LATEST_VERSION}", "zipball_url": f"https://example/v{LATEST_VERSION}.zip"},
+            {"name": f"v{NEXT_VERSION}", "zipball_url": f"https://example/v{NEXT_VERSION}.zip"},
             {"name": "v%s" % BASE_VERSION, "zipball_url": "https://example/base.zip"},
         ]
         body = json.dumps(payload).encode("utf-8")
@@ -245,7 +249,7 @@ def main():
         (vault1 / "AGENTS.md").write_text(custom_agents, encoding="utf-8", newline="\n")
         before_catalog = (vault1 / ".harness" / "scripts" / "generate_catalog.py").read_bytes()
         source2, commit2 = make_new_source(source1, temp)
-        plan_path = vault1 / ".harness" / "plans" / "reviewed-v1.21.0.json"
+        plan_path = vault1 / ".harness" / "plans" / f"reviewed-v{NEXT_VERSION}.json"
         plan_run = run([
             sys.executable, vault1 / ".harness" / "harness.py", "plan", vault1,
             "--source", source2, "--out", plan_path
@@ -255,11 +259,11 @@ def main():
         check("upgrade is planned before any managed byte changes", plan_run.returncode == 0 and (vault1 / ".harness" / "scripts" / "generate_catalog.py").read_bytes() == before_catalog, text(plan_run))
         check("plan preserves user-owned customization", actions.get("AGENTS.md") == "preserve-user", actions)
         check("plan distinguishes managed update and addition", actions.get(".harness/scripts/generate_catalog.py") == "update" and actions.get(".harness/scripts/new_tool.py") == "add", actions)
-        check("plan carries migration impact and changelog range", bool(plan.get("migration_impact")) and [item["version"] for item in plan.get("release_notes", [])] == ["1.21.0"], plan)
+        check("plan carries migration impact and changelog range", bool(plan.get("migration_impact")) and [item["version"] for item in plan.get("release_notes", [])] == [f"{NEXT_VERSION}"], plan)
 
         apply = run([sys.executable, vault1 / ".harness" / "harness.py", "apply", vault1, "--plan", plan_path])
         installed2 = json.loads((vault1 / ".harness" / "manifest.json").read_text(encoding="utf-8"))
-        check("reviewed upgrade applies and runs gates", apply.returncode == 0 and installed2["installed"] == {"version": "1.21.0", "commit": commit2, "at": installed2["installed"]["at"]}, text(apply))
+        check("reviewed upgrade applies and runs gates", apply.returncode == 0 and installed2["installed"] == {"version": f"{NEXT_VERSION}", "commit": commit2, "at": installed2["installed"]["at"]}, text(apply))
         check("upgrade never overwrites AGENTS.md customization", (vault1 / "AGENTS.md").read_text(encoding="utf-8") == custom_agents)
         check("upgrade installs managed update and new component", (vault1 / ".harness" / "scripts" / "generate_catalog.py").read_bytes() != before_catalog and (vault1 / ".harness" / "scripts" / "new_tool.py").is_file())
         backup_id = plan["plan_id"]

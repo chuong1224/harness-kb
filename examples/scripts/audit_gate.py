@@ -30,7 +30,7 @@ Inherited debt in the baseline never blocks, but it is printed on every run so i
 rot in silence. When a genuinely unrelated finding does block you, the way out is one
 command rather than switching the gate off:
 
-    audit_gate.py accept --why "left by the 16:57 session, tracked as W184"
+    audit_gate.py accept --why "left by the 16:57 session, tracked as TASK-EXAMPLE"
 
 `--why` is mandatory. Accepting debt without recording why is how a gate dies while still
 appearing to be alive.

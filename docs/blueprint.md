@@ -382,6 +382,34 @@ quiet channel two earlier rounds were spent closing. And keep the trigger narrow
 the file extensions that the failure mode actually applies to, so an unrelated permission error is
 never dressed up in a diagnosis that does not fit it.
 
+### A bounded hook needs a bounded test selection
+
+A full tooling run can outgrow the time available to an end-of-turn hook. If changing one
+spreadsheet generator launches every suite, the hook can spend its whole budget proving only
+that it ran out of time. Increasing the deadline postpones the problem; reducing the scope
+requires evidence about which suites depend on the changed files.
+
+The production vault now selects suites from reverse imports, dynamic script-name references,
+and reads of defined functions or constants. It follows those references transitively, includes
+neighboring suites, and uses both the previous green source map and the current map so removing
+an import cannot erase its own test obligation. Nested implementation files participate in the
+fingerprint even when only suites directly under `attachments` are discovered. Shared gate,
+locking, work-registry and reporting infrastructure still triggers a full run. A missing map,
+changed runtime, file addition or removal, or an unresolved affected source also falls back to a
+full run. The manual runner keeps its full-run default.
+
+The ledger is the difficult part. A scoped pass updates counts only for the suites actually
+executed and retains the others. Not selected is neither a zero count nor an unfinished selected
+suite. Coverage drops and silent suites still block; removing a suite still compares against the
+complete discovery set. A source change during execution prevents the run from recording a new
+green mark. These rules preserve the evidence instead of allowing an optimization to become a
+way to erase it. Static references are a conservative approximation, not proof against arbitrary
+runtime-generated dependencies; retain a full-run path for that boundary.
+
+This is a production design case study. The generic `examples/scripts/tooling_selfcheck.py`
+reference still runs the complete discovered suite set; this release does not add scoped execution
+to the public scaffold.
+
 ### One negative reading of a probabilistic component is not a verdict
 
 Every gate above assumes the thing it measures answers the same way twice. Some parts of an agent
