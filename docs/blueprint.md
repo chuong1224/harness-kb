@@ -940,6 +940,65 @@ run, unasked. **When a decision is framed as a choice between two supplied optio
 thing an instrument can do is report the quantity that shows both of them to be beside the point** —
 rather than dutifully picking the better of two answers to the wrong question.
 
+### Questions do not share a unit, so neither can the work that answers them
+
+A second-layer inspector here asks four things of a closed task: does the record match the ground,
+did it do everything it promised, do its stated assumptions still hold, and did later work silently
+break what it relied on. The first three are questions about a *record*. Only the fourth is a
+question about a *place in the code* that several records touched.
+
+That asymmetry had gone unnoticed because every round was scoped to tasks, so all four questions
+happened to be asked at the same granularity. The cost surfaced as throughput: roughly twenty-one
+must-inspect tasks close per week against three inspected, and no per-task scheduling fixes a ratio
+like that. Regions are the obvious lever — one region touched by seven tasks answers the fourth
+question once for all seven — and the obvious move is to swap the unit.
+
+**The obvious move is wrong, and the reason generalises.** Swapping task for region does not tighten
+the process; it destroys three of its four questions, because those three have no meaning at region
+granularity. A unit is not a matter of resolution, coarse versus fine. It is a matter of *what the
+claim is about*. So the unit is added, not replaced: regions became the unit of selection and of the
+cross-conflict question, records stayed the unit of the dossier questions, and inspecting one region
+answers the fourth question once plus the other three for every task in it — in a single sitting.
+That is where the throughput actually comes from, rather than from recounting the same work.
+
+**Keep the new unit as a way to select, not as a new kind of thing.** Opening a round by region
+simply resolves to the tasks that touched it; the round still records tasks. Because of that, the
+sealing mechanism, the separation-of-powers check, the priority ordering and the minutes gate needed
+no changes at all. A new unit that forces every existing ledger to be rewritten in its terms should
+be suspected of being a rename rather than an improvement.
+
+**Print what the new unit cannot see.** Region-based work never reaches a task that touched a region
+nobody else touched — here thirty of eighty-seven must-inspect tasks. Those are not an edge case to
+be discovered later; the selection command lists them under their own heading every run, and they
+stay inspectable the old way. A refinement that quietly narrows coverage while appearing to widen
+throughput is the most expensive kind of improvement, because the gap it opens is invisible in
+exactly the report that motivated it.
+
+**The bookkeeping problem recurs one layer down, and the same remedy applies.** Ranking regions by
+how many tasks they cover put four test-suite `main()` registration lists on top — the place every
+task that adds a test must append a line, and therefore a place where two tasks cannot conflict.
+This is the ledger-file problem from two sections ago, at finer grain. Frequency again fails to
+separate them: those lists sit at 12% of footprints while a genuinely contested function sits at
+5.5%. So they are declared by name, in the same rules file, and the cost is stated rather than
+hidden — 98 regions down to 85, coverage 68 tasks down to 57, orphans 19 up to 30. Eleven tasks
+moved from being inspected inside a fake question to needing a real one of their own. **A real
+question at a dearer unit beats a fake one at a cheap unit**, and the ranking now opens with
+functions where two changes genuinely met.
+
+**A prefix is not a name.** The first declaration excluded regions beginning `def main`, which also
+swallowed `def main_loop` — a real function, removed silently, visible in no output. A test caught
+it; nothing else would have. Whenever an exclusion list is matched by prefix, the prefix has to
+carry a terminator that the language itself enforces — here `def main(` — because an exclusion that
+is broader than intended produces no error, no warning, and no missing row anyone can point at.
+
+**Finally, the two lists in that rules file fail in opposite directions, deliberately.** The
+risk-zone list fails loud: unreadable means nothing is classified as needing inspection, the backlog
+empties and the gate goes green over an unexamined vault. The bookkeeping-exclusion list fails open:
+unreadable means the ranking is merely noisier, with a few registration lists drifting to the top
+where anyone can see them. Same file, same reader, opposite defaults — because **the direction to
+fail is set by which way the failure biases the answer, not by a house style for the file it lives
+in.**
+
 ### Put the guard where the bad act happens, not where the bad data is made
 
 Three sections above treat mis-attribution as a *reading* problem: given a history that already

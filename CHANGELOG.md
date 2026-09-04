@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2026-09-04
+
+### Added
+- **A blueprint section on questions that do not share a unit.** The second-layer inspector asks four
+  things of a closed task; three are about a record and only the fourth is about a place in the code
+  several records touched. Scoping every round to tasks hid that asymmetry until throughput exposed
+  it — roughly 21 must-inspect tasks close per week against 3 inspected — and the obvious fix, swapping
+  the unit from task to region, would have destroyed three of the four questions rather than tightening
+  anything. The section states the repair (add the unit instead of replacing it; let region be the unit
+  of selection and of the cross-conflict question while the record stays the unit of the dossier
+  questions) and four lessons that outlive it. Keep the new unit as a way to *select*: opening a round
+  by region resolves to tasks and the round still records tasks, so sealing, separation of powers,
+  priority and the minutes gate needed no changes — a unit that forces every ledger to be rewritten in
+  its terms should be suspected of being a rename. Print what the new unit cannot see: 30 of 87
+  must-inspect tasks touch no contested region, and they get their own heading every run, because a
+  refinement that quietly narrows coverage while appearing to widen throughput hides the gap inside the
+  very report that motivated it. The bookkeeping problem recurs one layer down — four test-suite
+  `main()` registration lists ranked top by coverage, frequency again failed to separate them (12% versus
+  5.5% for a genuinely contested function), so they are declared by name with the cost stated: 98 to 85
+  regions, 68 to 57 tasks covered, 19 to 30 orphans. And a prefix is not a name: excluding `def main`
+  also swallowed `def main_loop` silently, which only a test caught, so a prefix must carry a terminator
+  the language enforces.
+
 ## [1.21.2] - 2026-09-04
 
 ### Added
@@ -1099,6 +1122,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.22.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.22.0
 [1.21.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.2
 [1.21.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.1
 [1.21.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.0
