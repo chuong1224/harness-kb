@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.2] - 2026-09-04
+
+### Added
+- Document rules-test isolation with a disposable vault per run, explicit checker paths, and
+  mutation boundaries. Explain why restoring live data leaves concurrent readers exposed.
+- Describe acceptance during invalid fixture states, interrupted checks, concurrent runs, and an
+  independently validated observer that rejects source writes. This release changes documentation
+  only; the generic scaffold's installed behavior is unchanged.
+
 ## [1.21.1] - 2026-09-04
 
 ### Added
@@ -1090,6 +1099,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.21.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.2
 [1.21.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.1
 [1.21.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.0
 [1.20.12]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.12

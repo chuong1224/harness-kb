@@ -572,6 +572,23 @@ Two ways out, in order of preference:
      and raise the exit code. A test that quietly leaves damage behind is worse than a test that
      fails, because a failure gets investigated.
 
+Restoration still leaves an observation window. A concurrent checker, editor, or sync client can
+read deliberately invalid data before the restore succeeds. A clean final hash proves recovery;
+it does not prove that no other process saw the broken state. Treat a live-data guard as recovery
+machinery, not as isolation.
+
+The source project's rules suite now snapshots current notes and policy into a separate temporary
+vault for each run and invokes the production checker with explicit vault and rules paths. Files
+used only for existence checks need only preserve their paths. Mutation helpers reject paths outside
+the owned fixture, and temporary storage inside the source vault is rejected before creating files.
+Snapshot construction can still race with a legitimate writer; a failed baseline remains a failed
+test, never permission to repair the source from the snapshot.
+
+Acceptance observes the interval, not just the end: compare source bytes while the fixture is
+corrupt, exercise interrupted checks, and run two suites concurrently. An independent observer also
+checks modification times and rejects source writes in both parent and child Python processes. Test
+that observer against a disposable control source first, so a missing observer cannot certify itself.
+
 One more trap, cheap to avoid: build each case's broken content from the **snapshot**, never from
 what is currently on disk. Read the file back and one failed restore silently becomes the "original"
 for every case that follows.
