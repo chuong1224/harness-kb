@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0] - 2026-09-04
+
+### Added
+- **A blueprint section on metrics whose entire content is a known exception.** The inspector's
+  backlog counter read 43 overdue tasks, and all 43 were retroactive records the project had already
+  ruled out of back-tracing on the record — arithmetically correct, substantively incoherent, and the
+  only honest reader response was to stop reading the channel. The section states the repair (sort
+  every closed task into classes; count only those touching a declared risk zone or those the
+  classifier could not read; make every exemption print its own reason on demand; keep publishing the
+  old measure beside the new one so the filter's aggressiveness stays observable) and three lessons
+  that generalise past it. First, which direction a config consumer fails is a per-consumer decision
+  rather than a house style: the previous section's sieve fails open because losing it costs visible
+  noise, while this list must fail loud because losing it empties the backlog and turns the gate green
+  with nothing inspected — a false green outranks a false red because only one of them gets
+  investigated. Second, changing a measure severs its own history: old readings keep the definition
+  that produced them and leave the current trend, the new baseline is the first reading under the new
+  rule, and any store keyed on *when* needs *under what definition* in the key the moment definitions
+  become mutable — otherwise the week of the change silently rejects the new baseline as a duplicate.
+  Third, fixing the measure did not fix what the measure was for: roughly 21 must-inspect tasks close
+  per week against 3 inspected, so neither option in the original three-or-five question was ever
+  going to close the gap, and the instrument now reports that rate unasked.
+
 ## [1.20.12] - 2026-08-30
 
 ### Added
@@ -1055,6 +1077,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.21.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.0
 [1.20.12]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.12
 [1.20.11]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.11
 [1.20.10]: https://github.com/chuong1224/harness-kb/releases/tag/v1.20.10

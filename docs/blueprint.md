@@ -839,6 +839,62 @@ from; those footprints fall back to file-level pairing rather than vanishing. A 
 requires richer evidence should degrade to the older, coarser answer for records that lack it — not
 silently drop them, and not pretend to a precision the data never had.
 
+### A warning made entirely of a known exception is not a warning
+
+The inspector's backlog counter asked one question: how many closed tasks passed thirty days without
+anyone re-examining them? For two weeks it behaved. Then it read forty-three, and the forty-three
+had a property nobody had thought to check — every single one was a retroactive record with no
+commit id, drawn from the batch this project had already decided, on the record, never to trace
+backwards.
+
+That is worse than a wrong number. The counter was arithmetically correct; the metric was
+incoherent. It reported a backlog composed entirely of work that had been ruled out of scope, which
+means the only honest response available to a reader was to ignore it. **A signal whose content is
+100% known exception does not merely fail to inform — it trains its audience to stop reading the
+channel.** The first alarm still gets attention; the fourth teaches the habit that will also swallow
+the fifth, which might have been real.
+
+The repair is to make the metric answer a question worth asking. Every closed task is now sorted
+into one of a small set of classes, and only two of them count: those whose distinctive footprint
+touches a declared *risk zone*, and those the classifier could not read at all. The remaining
+classes are exempt — but exempt with a printed reason, one per task, on demand. **An exemption that
+cannot state its own grounds is indistinguishable from an oversight**, and a filter nobody can
+interrogate is not a filter, it is a pretext. Here that turns forty-three into zero, and the tool
+still prints what the old measure counted beside the new one, so the strength of the filter is
+itself measurable. A filter whose aggressiveness cannot be observed is one nobody can catch
+over-cutting.
+
+**Which direction a config consumer fails is a per-consumer decision, not a house style.** The
+previous section established a sieve that fails open, paired with a checker that fails closed. It
+would be natural, and wrong, to generalise that into a rule. The risk-zone list is read by the same
+program, from the same file, and must fail *loud*: if it cannot be read, no task is classified as
+requiring inspection, the backlog empties, and the gate turns green while nothing is being
+inspected. The earlier sieve fails open because losing it costs a little noise — a visible failure.
+This one would fail into silent, total, undetectable success. **The direction to fail is decided by
+which way the failure biases the answer: toward a question you can see, or toward an all-clear you
+cannot.** A false green outranks a false red as a hazard, because only one of them gets
+investigated.
+
+**Changing a measure severs its own history, and the baseline must be re-derived rather than
+inherited.** The backlog had a recorded starting point and a trend computed against it. Redefining
+what was counted made every prior reading incomparable, and the seductive move — keep the old
+constant, plot the new numbers against it — manufactures a spectacular improvement on precisely the
+day the definition changed. Older records are therefore kept, stamped with the definition that
+produced them, and excluded from the current trend; the new baseline is the first reading taken
+under the new rule. The idempotency key for a periodic measurement has to widen along with this: it
+was the ISO week, so the week of the change would have silently rejected the new baseline as a
+duplicate of the old reading. **Any store keyed on "when" needs "under what definition" in the key
+the moment definitions become mutable.**
+
+**Finally, and least comfortably: fixing the measure did not fix the thing the measure was for.**
+The original question was whether to inspect three tasks a week or five. The new classifier answers
+it by making the question moot — roughly twenty-one must-inspect tasks close per week here, against
+three inspected. Neither of the two options on the table was ever going to close that gap, and a
+narrower risk filter only moves the number to twenty-two. The tool now prints that rate on every
+run, unasked. **When a decision is framed as a choice between two supplied options, the most useful
+thing an instrument can do is report the quantity that shows both of them to be beside the point** —
+rather than dutifully picking the better of two answers to the wrong question.
+
 ### Put the guard where the bad act happens, not where the bad data is made
 
 Three sections above treat mis-attribution as a *reading* problem: given a history that already
