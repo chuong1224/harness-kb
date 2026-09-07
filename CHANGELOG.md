@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0] - 2026-09-07
+
+### Added
+- **A blueprint section on naming as a mechanical act.** The platform outgrew the name of its
+  original component and the replacement looked like an editorial question. Two counts taken before
+  the decision changed it. The name nobody had ratified was already in the writing **138 times**
+  across ten or more documents — and it was the exact word §8 uses for what a harness must *not* be,
+  so the vernacular had adopted the failure mode as the product name. The name that was chosen was
+  three letters long: **228** occurrences of that string in the corpus, but only **39** where it
+  stood as a word, meaning **189** sat inside `button`, `autonomous`, `Hearthstone` and, in a
+  Vietnamese corpus, `tổng` and `tồn tại` — a rename executed by search and replace would have
+  rewritten source code. A suffixed form collided **0** times and was adopted for writing while the
+  short name was kept for speech. The section states the general rule: a name has two audiences and
+  only one is human, the second reads it as a string and reports its verdict later as a corrupted
+  find-and-replace; two counts settle it in a minute, and only while the name is still changeable.
+  It also records why the reason must be stored beside the name rather than in the task history —
+  the awkward form invites a future tidy-up — and marks the boundary that the physical directory
+  keeps its old name while the application identity and the update channel are the two places a
+  rename needs a shim and a rollback, because both fail silently and late.
+
 ## [1.23.0] - 2026-09-07
 
 ### Added
@@ -1150,6 +1170,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.24.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.24.0
 [1.23.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.23.0
 [1.22.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.22.0
 [1.21.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.2
