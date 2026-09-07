@@ -1157,6 +1157,45 @@ clone has no hooks until the session-start command installs them, and `--no-veri
 These fences raise the cost of the careless path. They do not stop a determined one, and a document
 that claimed otherwise would be selling something.
 
+### A scheduled routine's prompt is a deployment target, not documentation
+
+Every scheduled routine in this system began life as a self-contained prompt. Each one carried its
+own copy of how to find the knowledge base, which capabilities it was allowed to use, what to do
+when one was missing, and which words to report status in. That is seven copies of a policy that is
+supposed to have one owner, and the copies drift in the quietest possible way: nothing fails, each
+routine simply keeps obeying an older edition of the rules than the one written down.
+
+The repair is a **pointer, not a rewrite**. Each routine's prompt opens with a fixed block that
+loads the shared connection contract, and everything after it stays the routine's own task, its own
+ordering guard, its own notification policy. The contract owns capability resolution and the status
+vocabulary; the prompt owns the job. Changing the policy for every routine afterwards is one edit.
+
+Two things about performing that migration are worth writing down, because both are easy to get
+wrong in a way that looks fine.
+
+**The diff is the deliverable.** A prompt is a working artifact that a machine executes unattended
+at a fixed hour; editing seven of them by retyping is seven chances to drop a line of a task nobody
+will read again until it silently fails at 8am. The migration was therefore held to a shape that
+could be checked mechanically: a byte-for-byte copy of the canonical block prepended, and for every
+routine a diff of exactly **four lines added and zero removed**. Zero removed is the whole claim —
+it is the evidence that the schedule, the ordering guard and the task survived untouched. An
+edit that cannot state its own diff shape is asking to be trusted rather than checked.
+
+**Count the routines where they run, not where their files sit.** The first audit script written to
+verify all of this took the list of routines from the directories on disk and found nine, then
+reported the migration incomplete. Nine was correct; nine directories existed. Only seven were
+registered with the scheduler — the other two were the residue of routines retired months earlier,
+still on disk because removing a schedule does not remove its folder. Nothing was wrong with the
+migration; the *measurement* was wrong, and it failed in the direction that manufactures work. The
+authoritative answer to "what runs here?" comes from the thing that runs them. A directory listing
+is a plausible-looking proxy, and a plausible-looking proxy is more expensive than an obviously
+missing one, because it produces a number confident enough to act on.
+
+The same asymmetry decides what such a migration may claim when it is finished. Prompts verified on
+disk prove the text is in place; they do not prove a scheduler read it. Those are different
+statements, and only the next real run closes the gap — which means the honest closing note names
+the hour of that run and says what to suspect first if the contract does not appear in it.
+
 ### A blueprint is not delivered until a consumer can install and evolve it
 
 A maintainer can have perfect SemVer, tags and release notes while every user remains stranded on

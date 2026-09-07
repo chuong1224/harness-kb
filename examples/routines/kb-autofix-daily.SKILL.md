@@ -13,6 +13,17 @@ cannot get wrong, and leaves everything else exactly where the audit put it.
 Read blueprint §7 before widening anything here. The value of this routine is not how much it
 fixes — it is that what it fixes can be proven safe.
 
+## Bootstrap: load the shared contract before doing any of this
+
+Before the task below, read the knowledge base's root agent entrypoints and load the connection
+contract they point to. That contract — not this prompt — owns capability resolution, permissions,
+dependency handling and the status vocabulary every routine reports in. Then continue with the task,
+ordering guard and notification policy defined below, unchanged. If a required dependency is
+missing, follow the contract; never change your own schedule or account.
+
+Keep this block first and keep it identical across routines. It is the only part of a routine prompt
+that is allowed to be shared text: everything under it is this routine's own job.
+
 ## Write boundary (the whole point)
 
 - You may write to **exactly one file yourself**: the handling log note (e.g. `Audit Handling Log`).

@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2026-09-07
+
+### Added
+- **A blueprint section on routine prompts as deployment targets.** Seven scheduled routines each
+  carried their own copy of how to reach the knowledge base, which capabilities they could use and
+  what to report when one was missing — one policy with seven owners, drifting in the quietest way
+  available, since nothing fails when a routine simply obeys an older edition of the rules. The
+  section states the repair (prepend a fixed pointer to one shared connection contract; leave the
+  task, ordering guard and notification policy under it untouched) and two lessons from performing
+  the migration. The diff is the deliverable: a prompt is executed unattended at a fixed hour, so
+  the migration was held to a mechanically checkable shape — the canonical block copied byte for
+  byte, and every routine showing exactly four lines added and zero removed, where *zero removed* is
+  the entire claim that the schedule and task survived. And count routines where they run, not where
+  their files sit: the first audit script took its list from directories on disk, found nine and
+  declared the migration incomplete, when only seven were registered with the scheduler and the
+  other two were folders left behind by routines retired months earlier. Nothing was wrong with the
+  migration; the measurement was wrong, and it failed in the direction that manufactures work. A
+  plausible-looking proxy costs more than an obviously missing one, because it yields a number
+  confident enough to act on. The same asymmetry bounds what such a migration may claim: prompts
+  verified on disk prove the text is in place, not that a scheduler read it, so the honest closing
+  note names the hour of the next real run and what to suspect first if the contract is absent
+  from it.
+
+### Changed
+- Both example routine prompts (`kb-audit-daily`, `kb-autofix-daily`) now open with the shared
+  bootstrap block that loads the connection contract before the routine's own task, demonstrating
+  the shape the blueprint section describes.
+
 ## [1.22.0] - 2026-09-04
 
 ### Added
@@ -1122,6 +1150,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.23.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.23.0
 [1.22.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.22.0
 [1.21.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.2
 [1.21.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.21.1
