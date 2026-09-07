@@ -1283,6 +1283,67 @@ detail is what did *not* change: the build's artifact generation hash was identi
 after, which is the proof that a hundredfold expansion of the descriptive layer touched none of the
 bytes that actually ship.
 
+### A name the migration will search for is a mechanical object, not only a meaningful one
+
+The platform outgrew its name. What began as a 3D graph of the vault had become the thing that owns
+the skills, the knowledge slices, the policy, the evaluation sets and the evidence trail; the graph
+was now one view inside it. Renaming was already scheduled as its own task, touching the UI, the
+docs, the launcher, the Windows AUMID, the stored state, the shortcuts, the repository and the
+update channel. The only open question looked purely editorial: what should the thing be called.
+
+Two measurements taken before the decision changed it. The first was of the name nobody chose. The
+word *cockpit* appeared **138 times** across ten or more documents — in a README, in a roadmap, in
+construction dossiers, in a retrieval skill. No one had ever ratified it; it had simply become what
+everybody typed. That is worth knowing before proposing anything, because a name that has already
+grown in the writing is cheaper to adopt than one imposed over it. It also carried a warning
+specific to this repository: *cockpit* is the exact word §8 uses for what a harness must **not** be —
+a panel you watch rather than a mechanism that acts. The vernacular had quietly adopted the failure
+mode as the product name.
+
+The second measurement was of the name that was chosen. The owner picked `TON`, after TON 618, the
+heaviest black hole ever measured — a core that pulls everything into itself, which is precisely the
+architecture. The objection to it was not aesthetic and could not have been reached by taste. The
+rename is executed by search and replace across code and prose, and a three-letter token is a
+substring of a great many words. Counted in the vault: **228** occurrences of the string `ton`, but
+only **39** where `ton` stands as a word — meaning **189 of them live inside other words**: `button`,
+`autonomous`, `Hearthstone`, and, in a Vietnamese-language corpus, `tổng` and `tồn tại`. A migration
+told to replace `ton` would have rewritten `button` in the source. The same count for `TON618` was
+**0**.
+
+So the written identifier became `TON618` and the spoken one stayed "TON". Nothing of the owner's
+intent was given up — 618 is part of the black hole's name — and the migration got a token it can
+search for safely.
+
+**The general rule is that a name has two audiences and only one of them is human.** People read a
+name for meaning, memorability and fit. Every automated rename, grep, log filter, config key, URL
+slug and package identifier reads it as a string, and judges it on exactly one property: whether it
+appears anywhere it does not mean. Both audiences have to be satisfied at the moment of naming,
+because the second one only reports its verdict later, as a corrupted find-and-replace in a file
+nobody was looking at. Two counts — occurrences of the token, and occurrences of it as a standalone
+word — take a minute and turn the question from a matter of preference into a matter of evidence.
+
+**Measure the collision before the decision, not after.** Had the name been ratified first and
+measured during the migration, the choice would have been between an expensive manual rename and
+re-opening a decision already announced — the position where people quietly accept the risk. The
+measurement is cheap precisely while the name is still changeable.
+
+**Record why the awkward form was chosen, next to the name itself.** `TON618` reads as though someone
+merely appended a number, and the obvious future edit is to tidy it back to `TON`. The counts and
+their consequence therefore live in the same paragraph as the decision, in the canonical document —
+not only in the task history — so that the next person to find the name ugly meets the reason before
+the edit. A constraint that survives only in the memory of the session that discovered it is not a
+constraint.
+
+One boundary is worth stating, because the tempting move is to rename everything at once. The
+physical directory holding the running code keeps its old name. It appears in stored state and in
+shortcuts, an alias at the display layer costs nothing, and renaming it buys only consistency in
+something no user reads. The two places where the rename genuinely must carry a compatibility shim
+and a rollback are the ones with no user-visible failure until much later: the application identity
+the operating system pins shortcuts to, and the update channel — get that wrong and the second
+machine simply stops receiving releases, silently, which is the same failure this document keeps
+finding in every other disguise.
+
+
 ---
 
 ## 6. Roadmap: closing the loops
