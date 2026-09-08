@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.0] - 2026-09-08
+
+### Added
+- **A blueprint passage on a measure that counted in one unit and reported in another.** The
+  region brief opened with the number of times a region had been touched, but it was counting every
+  commit of every task that had ever touched that region — bookkeeping commits, edits to unrelated
+  functions in the same file — and calling the total the region's history. Across ninety-three
+  contested regions it printed **679** rows where **300** were real, inflating **85** of them, and
+  on one region **three of five** commands it offered printed zero bytes when run. The passage
+  rejects the cheap repair of rewording the caption: this number is what a reader uses to judge how
+  contested a region is, so counting a different thing is a broken instrument rather than an
+  imprecise label. It records the part that generalises — the filter reuses the *same function that
+  defines the region unit everywhere else*, because a second, private definition of the unit inside
+  a report drifts from the one used for pairing and no test compares them — and the boundary that
+  where a region is only known at file granularity, the report stays there rather than inventing a
+  sharper answer than the unit can support.
+
 ## [1.24.0] - 2026-09-07
 
 ### Added
@@ -1170,6 +1187,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.25.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.0
 [1.24.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.24.0
 [1.23.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.23.0
 [1.22.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.22.0
