@@ -999,6 +999,27 @@ where anyone can see them. Same file, same reader, opposite defaults — because
 fail is set by which way the failure biases the answer, not by a house style for the file it lives
 in.**
 
+**A measure may not count in one unit and report in another.** The region brief opened with a
+count of how many times that region had been touched, then listed the commands to see each change.
+It was counting every commit of every task that had ever touched the region — bookkeeping commits,
+fixes to unrelated functions in the same file, anything the task had done — and calling the total
+the region's history. Across all ninety-three contested regions it printed six hundred and
+seventy-nine rows where three hundred were real, inflating eighty-five of them; on one region three
+of the five commands it offered printed zero bytes when run. The inflation had gone unnoticed
+because nothing about the output looked wrong: rows were plausible, ordering was right, and only
+running the commands it supplied revealed that some pointed at nothing.
+
+The temptation is to read this as wording — call the number "commits by tasks in this region" and
+the sentence becomes true. That is the wrong repair, and the reason is worth stating: this number is
+the one a reader uses to judge how contested a region is, so a count that answers a different
+question is a broken instrument, not an imprecise caption. The fix filters the history through the
+*same function that defines the region unit everywhere else*, which matters more than the filtering
+itself — a second, private definition of "region" living inside the report would drift from the one
+used for pairing, and the two would disagree in a way no test compares. Where a region is only known
+at file granularity, the filter stays at file granularity rather than inventing a sharper answer than
+the unit can support. **Report at the resolution the unit actually has**, and get that resolution
+from the one place that defines it.
+
 ### Put the guard where the bad act happens, not where the bad data is made
 
 Three sections above treat mis-attribution as a *reading* problem: given a history that already
