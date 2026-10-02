@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.1] - 2026-10-02
+
+### Changed
+- **The auto-fix template now waits for the audit in up to three 9-minute runs instead of two.**
+  Counting the audit's real durations showed 63 of 72 runs finishing inside two waits and 71 inside
+  three; on a morning when the scheduler fires every overdue routine at once, the remaining runs
+  are the ones that would make the fixer stand down. The budget is spread over several runs rather than
+  one long `--timeout`, because an agent tool call is usually capped near ten minutes and a wait
+  killed mid-way is a tool error, not the clean timeout exit the step branches on.
+
+### Added
+- **A blueprint passage on a timing diagnosis that was wrong in the direction that made it fit.**
+  Two missing log days had been blamed on the wait budget — the report supposedly landed ten
+  seconds after the wait expired. The wait, however, had not started when the session did; it had
+  succeeded with eighteen seconds to spare, and both days were a manual reboot killing a routine
+  mid-run. The passage keeps the widened budget on its own evidence and records the part that
+  generalises: measure the wait, not a proxy start time, and remember that a routine killed by a
+  reboot leaves the same trace as one that stood down.
+
 ## [1.25.0] - 2026-09-08
 
 ### Added
@@ -1187,6 +1206,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.25.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.1
 [1.25.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.0
 [1.24.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.24.0
 [1.23.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.23.0

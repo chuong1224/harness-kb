@@ -1608,6 +1608,19 @@ plus the wiring in the routine templates. Design decisions:
   invariant — idle (180s) must exceed in-flight (90s), or the guard says "all quiet, go" while the
   reader still skips that session and the row silently vanishes for a day. A test holds that line,
   not a comment.
+- **Size the wait from measured durations — and measure the wait, not the session.** The first
+  wait allowed the auto-fixer two 9-minute polls. Two missing log days were then blamed on that
+  budget: on one, the audit and the fixer had fired in the same second and the report landed "about
+  ten seconds after the wait expired". Reading the machine instead of the ledger said otherwise.
+  The wait had not started when the session did — bootstrap took three minutes — so it had returned
+  success with eighteen seconds to spare, the fixer had run, and **the machine was rebooted by hand
+  three seconds later**. The other day was the same reboot killing the audit itself. The budget was
+  still widened (three polls; one longer poll is impossible when a single tool call is capped near
+  ten minutes), because the recount showed nine runs in seventy-two outlasting two polls — but the
+  lesson that generalises is about the measurement: a timing diagnosis built on a *proxy* start
+  time ("the session began at X, so the wait began at X") can be wrong in exactly the direction
+  that makes the story fit. And a routine killed by a reboot leaves the same trace as one that
+  stood down: a missing entry, no error.
 
 The same five routines, with the order restored — and note that each timeout has a *different*
 right answer:

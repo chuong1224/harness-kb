@@ -46,9 +46,13 @@ that is allowed to be shared text: everything under it is this routine's own job
    ```
 
    - `0` → the report carries today's date; continue with step 1.
-   - `3` → retry the same command **once**. Still `3` → **stand down**: do not run the fixer, do not
-     write a log entry, do not file work items. Final message:
-     `Deferred - no audit report for today after ~18 minutes of waiting.`
+   - `3` → run the same command again, **up to three runs in total** (~27 minutes). Size this from
+     your own audit durations, not from a guess: ours covered 39 of 72 measured runs in one 9-minute
+     wait, 63 in two, 71 in three. Keep each run at 540s rather than one long `--timeout` — an agent
+     tool call is usually capped near 10 minutes, and a wait that gets killed mid-way is a tool error,
+     not the clean exit `3` this step branches on. Third run still `3` → **stand down**: do not run the
+     fixer, do not write a log entry, do not file work items. Final message:
+     `Deferred - no audit report for today after ~27 minutes of waiting.`
    - `2` → report unreadable, or dated after today (clock skew) → stand down the same way and quote
      stderr verbatim.
 
