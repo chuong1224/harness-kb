@@ -13,6 +13,7 @@ Run:   python examples/scripts/test_claim.py
 Exit:  0 = all cases pass, 1 = at least one failed
 """
 
+import importlib.util
 import json
 import os
 import shutil
@@ -162,7 +163,8 @@ def main() -> int:
         code, out = run(["take", "ops/runbook.md", "--stream", "B", "--vault", str(vault)])
         report("3. a second stream is BLOCKED on the same file",
                code == 1 and "CLAIM LOCK" in out and "rewriting rollback" in out, out)
-        report("4. a blocked stream leaves no stale entry", keys_of("B") == [], str(keys_of("B")))
+        # (A former case 4, "a blocked stream leaves no stale entry", was dropped: B never held an
+        # entry, so it could only fail if BOTH withdrawal paths broke. Cases 25 and 25b guard each.)
 
         code, out = run(["take", "ops/runbook.md", "--stream", "A", "--vault", str(vault)])
         report("5. the holder can renew (never blocks itself)", code == 0, out)
@@ -246,8 +248,8 @@ def main() -> int:
                code == 0 and not rec_of("OLD").is_file(), out)
 
         reset()
-        # Simulated race: B wrote an earlier `since` that A had not seen when it checked.
-        # Only the re-read (write-then-verify) catches it, and A must withdraw.
+        # B already holds an earlier `since` before A calls take, so A loses at the cheap
+        # PRE-CHECK and must drop its own old entry (the ledger never shows two owners).
         run(["take", "ops/runbook.md", "--stream", "A", "--vault", str(vault)])
         now = time.time()
         rec_of("B").write_text(json.dumps({
@@ -255,8 +257,39 @@ def main() -> int:
             "files": {"ops/runbook.md": {"since": now - 30, "touched": now}},
         }, ensure_ascii=False), encoding="utf-8")
         code, out = run(["take", "ops/runbook.md", "--stream", "A", "--vault", str(vault)])
-        report("25. in a close race the earlier claim wins and the loser withdraws",
+        report("25. the pre-check sees an earlier owner and the loser drops its old entry",
                code == 1 and keys_of("A") == [], out + str(keys_of("A")))
+
+        # A real close race: A's pre-check does NOT see B (B writes in between), so A writes its
+        # claim and only the re-read after writing (write-then-verify) can arbitrate. Patch
+        # load_records so the first read misses B; the re-read is the real disk.
+        reset()
+        cdir().mkdir(parents=True, exist_ok=True)
+        now = time.time()
+        rec_of("B").write_text(json.dumps({
+            "stream": "B", "host": HOST, "agent": "agent", "updated": now,
+            "files": {"ops/runbook.md": {"since": now - 30, "touched": now}},
+        }, ensure_ascii=False), encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("claim_race", SCRIPT)
+        cm = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cm)
+        real_load = cm.load_records
+        reads = []
+
+        def first_read_misses_b(d):
+            reads.append(1)
+            recs = real_load(d)
+            return [r for r in recs if r.get("stream") != "B"] if len(reads) == 1 else recs
+        cm.load_records = first_read_misses_b
+        try:
+            allowed, holder = cm.take(cdir(), "A", "agent", "ops/runbook.md")
+        finally:
+            cm.load_records = real_load
+        report("25b. in a close race the re-read after writing arbitrates and the loser withdraws",
+               len(reads) >= 2 and not allowed and holder and holder[1] == "B"
+               and keys_of("A") == [] and keys_of("B") == ["ops/runbook.md"],
+               "allowed=%r holder=%r A=%r B=%r" % (allowed, holder and holder[1], keys_of("A"),
+                                                    keys_of("B")))
     finally:
         wipe(tmp)
         vault = None

@@ -17,11 +17,13 @@ never damage anything.
   9. two markers sharing a pattern: each number is fixed in its own slot
   9b. ...even when both numbers are already equal, which no overlap check can catch
   9c. the last-resort overlap guard is still alive
+  10. the neighbour invocations auto_fix really builds are accepted by those neighbours
 
 Usage: python test_auto_fix.py
 Exit:  0 = all pass, 1 = at least one failure
 """
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -64,12 +66,11 @@ class Sandbox:
     def __exit__(self, *exc):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def run(self, *args, env_extra=None):
+    def run(self, *args, env_extra=None, script=SCRIPT):
         env = dict(os.environ)
-        env.pop("KB_AUTOFIX_FORCE_VERIFY_FAIL", None)
         env.update(env_extra or {})
         p = subprocess.run(
-            [sys.executable, str(SCRIPT), str(self.vault), "--rules", str(self.rules),
+            [sys.executable, str(script), str(self.vault), "--rules", str(self.rules),
              "--backup-dir", str(self.backups), *args],
             capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
         return p.returncode, (p.stdout or "") + (p.stderr or "")
@@ -158,13 +159,27 @@ def main():
                code == 0 and target.read_text(encoding="utf-8") == broken, "exit=%d" % code)
 
     # 5 ----------------------------------------------------------------------
+    # No test-only "force a failure" switch in auto_fix.py: such a switch returns before the
+    # real gate check, so the branch it claims to test is never run. Instead run a copy of
+    # auto_fix.py whose neighbouring verify_kb.py is a stub that turns red exactly when the
+    # target has been fixed - a fix that "breaks" the integrity gate.
     with Sandbox() as box:
         target, lineno = box.target()
         _, broken = box.break_line(target, lineno, off_by_one)
-        code, out = box.run("--apply", env_extra={"KB_AUTOFIX_FORCE_VERIFY_FAIL": "1"})
+        tools = box.tmp / "tools"
+        tools.mkdir()
+        for name in ("auto_fix.py", "check_rules_drift.py", "claim.py"):
+            shutil.copy2(HERE / name, tools / name)
+        broken_sha = hashlib.sha256(broken.encode("utf-8")).hexdigest()
+        (tools / "verify_kb.py").write_text(
+            "import hashlib, sys\n"
+            "h = hashlib.sha256(open(%r, 'rb').read()).hexdigest()\n"
+            "sys.exit(0 if h == %r else 1)\n" % (str(target), broken_sha), encoding="utf-8")
+        code, out = box.run("--apply", script=tools / "auto_fix.py")
         rolled = target.read_text(encoding="utf-8") == broken
-        report("5 - red gate after the fix rolls back and exits 1",
-               code == 1 and rolled and "rolled back" in out.lower(),
+        report("5 - integrity gate red after the fix rolls back and exits 1",
+               code == 1 and rolled and "rolled back" in out.lower()
+               and "verify_kb.py exited 1" in out,
                "exit=%d, file %s" % (code, "restored" if rolled else "NOT restored"))
 
     # 6 ----------------------------------------------------------------------
@@ -272,25 +287,32 @@ def main():
     # caller reading "non-zero" as "gate red" turns into a permanent, quiet refusal to
     # do any work - the failure mode that sounds like caution. Exit 0 or 1 are both fine
     # here (green gate / red gate); exit 2 means we are calling it wrong.
+    # The argv lists are captured from auto_fix's OWN call sites (its `run` is swapped for a
+    # recorder), never copied by hand: a hand-copied list stays green when the call drifts.
+    spec = importlib.util.spec_from_file_location("auto_fix_shapes", SCRIPT)
+    af = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(af)
     with Sandbox() as box:
-        shapes = [
-            ("check_rules_drift.py", ["check_rules_drift.py", str(box.vault),
-                                      "--rules", str(box.rules), "--json"]),
-            ("verify_kb.py", ["verify_kb.py", str(box.vault), "--rules", str(box.rules)]),
-            ("claim.py", ["claim.py", "check", "Ops/Index - Ops.md", "--vault", str(box.vault),
-                          "--stream", "autofix-selftest"]),
-        ]
+        calls = []
+        real_run = af.run
+        af.run = lambda cmd, cwd: (calls.append([str(c) for c in cmd])
+                                   or subprocess.CompletedProcess(cmd, 0, "{}", ""))
+        try:
+            af.drift_check(box.vault, box.rules)
+            af.integrity_gate(box.vault, box.rules)
+            af.claims_acquire(box.vault, ["Ops/Index - Ops.md"], "autofix-selftest")
+            af.claims_release(box.vault, "autofix-selftest")
+        finally:
+            af.run = real_run
         bad = []
-        for label, argv in shapes:
-            tool = HERE / argv[0]
-            if not tool.exists():
-                continue
-            p = subprocess.run([sys.executable, str(tool), *argv[1:]], capture_output=True,
-                               text=True, encoding="utf-8", errors="replace")
+        for argv in calls:
+            p = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", cwd=str(box.vault))
             if p.returncode == 2 or "unrecognized arguments" in (p.stderr or ""):
-                bad.append("%s -> exit %d" % (label, p.returncode))
+                bad.append("%s -> exit %d" % (" ".join(argv[1:3]), p.returncode))
         report("10 - neighbours are called in a shape they accept (no usage errors)",
-               not bad, "; ".join(bad) if bad else "%d invocation(s) accepted" % len(shapes))
+               len(calls) == 4 and not bad,
+               "; ".join(bad) if bad else "%d invocation(s) accepted" % len(calls))
 
     print()
     print("all cases passed" if not failures else "%d case(s) FAILED" % failures)

@@ -163,7 +163,8 @@ def main() -> int:
         worse = {"STUB_INTEGRITY": bad["STUB_INTEGRITY"] + "|notes/b.md: brand new problem"}
         code, out = run(vault, state, "hook-stop", payload={"cwd": str(vault)}, env=worse)
         check("blocks on the new one", code == 2, "exit=%d" % code)
-        check("only the new one is called new", "brand new problem" in out)
+        check("only the new one is called new",
+              "brand new problem" in out and "dangling link" not in out)
         check("inherited debt is named as not-the-blocker", "inherited finding" in out)
 
         print("\n7. paths keeps a gate off the critical path")
@@ -173,7 +174,8 @@ def main() -> int:
         log.write_text("", encoding="utf-8")
         run(vault, state, "run", env={"STUB_LOG": str(log)})
         ran = log.read_text(encoding="utf-8").split()
-        check("a note change does not run the code suite", "suite" not in ran, "ran: %s" % ran)
+        check("a note change does not run the code suite",
+              "integrity" in ran and "suite" not in ran, "ran: %s" % ran)
         touch(vault / "code" / "app.py", "# app2\n")
         log.write_text("", encoding="utf-8")
         run(vault, state, "run", env={"STUB_LOG": str(log)})
@@ -207,7 +209,7 @@ def main() -> int:
                         env=dict(bad, AUDIT_GATE_OFF="1"))
         check("AUDIT_GATE_OFF=1 lets the turn end", code == 0, "exit=%d" % code)
         code, out = run(vault, state, "hook-stop", raw=b"this is not json")
-        check("a broken payload does not jail the session", code in (0, 2), "exit=%d" % code)
+        check("a broken payload does not jail the session", code == 0, "exit=%d" % code)
 
         print("\n12. status reports the baseline it is holding")
         run(vault, state, "forget")

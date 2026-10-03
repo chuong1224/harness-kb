@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.2] - 2026-10-03
+
+### Fixed
+- **Nine test assertions that could never fail now fail when the code they guard breaks.**
+  The claim, audit-gate and auto-fix suites were read assertion by assertion, and each
+  tightened one was checked by deliberately breaking the production code it is meant to guard:
+  - **Claim lock (`test_claim.py`).** Case 25 claimed to test the close-race arbitration, but
+    it seeded the rival claim *before* the call, so the stream lost at the cheap pre-check.
+    Deleting the write-then-verify block in `claim.py` left the suite green. Case 25 is now
+    named for what it tests. A new case 25b hides the rival from the first read only, so only
+    the re-read after writing can settle the race. Case 4 is gone: it could only fail if
+    *both* withdrawal paths broke, and each path now has its own case.
+  - **Audit gate (`test_audit_gate.py`).** Three assertions are tighter:
+    - "only the new one is called new" now also requires the inherited finding to be absent;
+    - "a note change does not run the code suite" now also requires that a gate ran at all;
+    - "a broken payload does not jail the session" no longer accepts exit 2.
+
+### Removed
+- **`KB_AUTOFIX_FORCE_VERIFY_FAIL`, a test-only switch in `auto_fix.py`.** The switch returned
+  before the real post-fix gate check, so the rollback test never exercised the branch it was
+  named after. Case 5 now runs a copy of `auto_fix.py` beside a stub `verify_kb.py`. The stub
+  turns red exactly when the target has been fixed.
+- **Hand-copied argument lists in auto-fix case 10.** The case now captures the commands
+  `auto_fix.py` really builds, by swapping its `run` for a recorder, and runs each one for real.
+  A list copied by hand stays green when the real call drifts.
+
 ## [1.25.1] - 2026-10-02
 
 ### Changed
@@ -1206,6 +1232,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.25.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.2
 [1.25.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.1
 [1.25.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.0
 [1.24.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.24.0

@@ -414,8 +414,6 @@ def _apply_locked(args, vault, rules_path, rules, root, fixes, skipped):
 
 
 def verify_after(vault, rules_path, errors):
-    if os.environ.get("KB_AUTOFIX_FORCE_VERIFY_FAIL") == "1":     # tests only
-        return {"ok": False, "why": "forced failure via KB_AUTOFIX_FORCE_VERIFY_FAIL"}
     if errors:
         return {"ok": False, "why": "; ".join(errors)[:300]}
     after = drift_check(vault, rules_path)
