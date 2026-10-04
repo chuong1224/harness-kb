@@ -337,7 +337,7 @@ def cmd_apply(args, vault, rules_path, rules, root):
     rels = sorted({f["file"] for f in fixes})
     # A dedicated stream id on purpose: this run ends with "release --all", and borrowing
     # the calling session's stream would drop claims that session holds for other work.
-    stream = os.environ.get("KB_AUTOFIX_STREAM") or ("autofix-%d" % os.getpid())
+    stream = "autofix-%d" % os.getpid()
     blocked, holding = claims_acquire(vault, rels, stream)
     if blocked:
         emit(args.json, {"ok": False, "deferred": blocked},

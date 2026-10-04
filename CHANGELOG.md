@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.4] - 2026-10-04
+
+### Fixed
+- **The auto-fix rollback on "drift check still reports errors" was never tested.**
+  `verify_after` rolls a fix back in either of two cases:
+  - the integrity gate is red;
+  - the drift checker still reports errors.
+
+  Case 5 covers only the first. Disabling the second branch left every case green. A new case
+  5b runs a copy of `auto_fix.py` beside a wrapper of the real drift checker. Once the target
+  has been fixed, the wrapper adds one error that the fixer does not own. The run must roll
+  back and exit 1, and disabling the branch now turns 5b red.
+
+### Removed
+- **`KB_AUTOFIX_STREAM`, an environment override that nothing set.** The claim stream is
+  always `autofix-<pid>`. The comment above that line already explains why the stream must be
+  the script's own and never borrowed from the calling session.
+
 ## [1.25.3] - 2026-10-04
 
 ### Fixed
@@ -1256,6 +1274,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.25.4]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.4
 [1.25.3]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.3
 [1.25.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.2
 [1.25.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.1

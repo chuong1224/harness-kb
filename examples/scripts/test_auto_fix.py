@@ -11,6 +11,7 @@ never damage anything.
   3. running again is a no-op (no empty backup every morning)
   4. a number written in words is SKIPPED, never guessed
   5. a red gate after the fix rolls everything back and exits 1
+  5b. ...and so does a fix after which the drift check reports new errors
   6. --rollback restores the state from before a run
   7. files the rules file does not register are never touched
   8. a CRLF file is still CRLF afterwards - a one-token fix must not rewrite every line
@@ -220,6 +221,39 @@ def main():
         report("5 - integrity gate red after the fix rolls back and exits 1",
                code == 1 and rolled and "rolled back" in out.lower()
                and "verify_kb.py exited 1" in out,
+               "exit=%d, file %s" % (code, "restored" if rolled else "NOT restored"))
+
+    # 5b ---------------------------------------------------------------------
+    # The other half of the post-fix check: the drift checker itself must not report errors
+    # after the fix. Wrap a copy of the real checker so that, once the target has been fixed,
+    # it adds one error the fixer does not own - a fix that "creates" a new drift error.
+    with Sandbox() as box:
+        target, lineno = box.target()
+        _, broken = box.break_line(target, lineno, off_by_one)
+        tools = box.tmp / "tools"
+        tools.mkdir()
+        for name in ("auto_fix.py", "verify_kb.py", "claim.py"):
+            shutil.copy2(HERE / name, tools / name)
+        shutil.copy2(HERE / "check_rules_drift.py", tools / "check_rules_drift_real.py")
+        broken_sha = hashlib.sha256(broken.encode("utf-8")).hexdigest()
+        (tools / "check_rules_drift.py").write_text(
+            "import hashlib, json, subprocess, sys\n"
+            "sys.stdout.reconfigure(encoding='utf-8')\n"
+            "p = subprocess.run([sys.executable, %r, *sys.argv[1:]], capture_output=True,\n"
+            "                   text=True, encoding='utf-8')\n"
+            "h = hashlib.sha256(open(%r, 'rb').read()).hexdigest()\n"
+            "if '--json' in sys.argv and h != %r:\n"
+            "    d = json.loads(p.stdout)\n"
+            "    d['errors'] = d.get('errors', []) + ['PROBE: an error the fixer does not own']\n"
+            "    print(json.dumps(d))\n"
+            "    sys.exit(1)\n"
+            "sys.stdout.write(p.stdout); sys.stderr.write(p.stderr); sys.exit(p.returncode)\n"
+            % (str(tools / "check_rules_drift_real.py"), str(target), broken_sha),
+            encoding="utf-8")
+        code, out = box.run("--apply", script=tools / "auto_fix.py")
+        rolled = target.read_text(encoding="utf-8") == broken
+        report("5b - drift check reporting errors after the fix rolls back and exits 1",
+               code == 1 and rolled and "drift check still reports" in out,
                "exit=%d, file %s" % (code, "restored" if rolled else "NOT restored"))
 
     # 6 ----------------------------------------------------------------------
