@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import threading
@@ -25,6 +26,7 @@ NEXT_VERSION = f"{_base_major}.{_base_minor + 1}.0"
 LATEST_VERSION = f"{_base_major}.{_base_minor + 2}.0"
 FAILURES = []
 ASSERTIONS = 0
+OWNED = set()                    # workspace roots this run created; the only things it deletes
 
 
 def check(label, condition, detail=""):
@@ -159,15 +161,47 @@ def release_server():
         thread.join(timeout=5)
 
 
+def own_workspace(p):
+    """Accept only a workspace root this run created (or a path inside one).
+
+    The scratch directory is user-configurable (HARNESS_TEST_TMP), so "it is under scratch" is
+    not ownership: a sibling run-* of another, still running test would pass that check."""
+    if p is None:
+        return False
+    try:
+        candidate = Path(p).resolve()
+    except OSError:
+        return False
+    return any(candidate == owner or owner in candidate.parents for owner in OWNED)
+
+
+def _writable_then_retry(func, path, _exc):
+    """Git marks object files read-only on Windows; rmtree cannot unlink them until it may."""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
+def wipe(p):
+    """Delete only an owned workspace, read-only files included; refuse everything else."""
+    if not own_workspace(p):
+        print("[cleanup] refusing to delete a path this run does not own: %s" % p, file=sys.stderr)
+        return
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(p, onexc=_writable_then_retry)
+    else:
+        shutil.rmtree(p, onerror=_writable_then_retry)
+
+
 @contextlib.contextmanager
 def test_workspace(scratch):
     """Use ordinary mkdir permissions; tempfile's 0700 ACL is hostile in some Windows sandboxes."""
     root = Path(scratch) / ("run-" + uuid.uuid4().hex)
-    root.mkdir(parents=True)
+    root.mkdir(parents=True)                 # no exist_ok: a fresh directory or nothing
+    OWNED.add(root.resolve())
     try:
         yield root
     finally:
-        shutil.rmtree(root, ignore_errors=True)
+        wipe(root)
 
 
 def unused_local_port():
@@ -188,6 +222,15 @@ def main():
     scratch = Path(os.environ.get("HARNESS_TEST_TMP") or (ROOT / ".test-tmp"))
     scratch.mkdir(parents=True, exist_ok=True)
     with test_workspace(scratch) as temp:
+        # Deletion breaker: only the predicate is measured, nothing dangerous is deleted.
+        check("S1. own_workspace rejects the current directory",
+              not own_workspace(Path()) and not own_workspace(Path.cwd()))
+        check("S2. own_workspace rejects the scratch root itself", not own_workspace(scratch))
+        check("S3. own_workspace accepts this run's root and paths inside it",
+              own_workspace(temp) and own_workspace(temp / "vault-one"))
+        check("S4. own_workspace rejects a sibling run-* directory of another run",
+              not own_workspace(scratch / ("run-" + uuid.uuid4().hex)))
+
         source1, commit1 = make_base_source(temp)
         cli1 = source1 / "examples" / "scripts" / "harness.py"
         vault1 = temp / "vault-one"
@@ -313,6 +356,11 @@ def main():
 
         final_verify = run([sys.executable, vault1 / ".harness" / "harness.py", "verify", vault1])
         check("full lifecycle leaves the original harness green", final_verify.returncode == 0, text(final_verify))
+
+    # The workspace holds copied git repositories, and git marks its object files read-only
+    # on Windows. A plain rmtree with ignore_errors left every run behind, silently.
+    check("the throwaway workspace is fully removed, read-only git objects included",
+          not temp.exists(), str(temp))
 
     print("\nSUMMARY: %s" % ("ALL PASS (%d assertions)" % ASSERTIONS if not FAILURES else "FAIL %d/%d" % (len(FAILURES), ASSERTIONS)))
     return 1 if FAILURES else 0

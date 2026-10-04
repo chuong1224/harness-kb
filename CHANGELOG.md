@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.5] - 2026-10-04
+
+### Fixed
+- **The lifecycle suite left its whole workspace behind on every Windows run.**
+  `test_harness.py` copies git repositories into a fresh `run-<uuid>` directory under
+  `.test-tmp/`. Git marks its object files read-only on Windows, so
+  `shutil.rmtree(..., ignore_errors=True)` gave up on them without a word. One clone had
+  collected 24 leftover runs, about 25 MB, before this was noticed. The cleanup now makes a
+  read-only file writable and retries, and a new assertion requires the workspace to be gone
+  after the run. That assertion failed on the old code, for exactly this reason, before the
+  fix went in.
+- **The same cleanup now deletes only a workspace this run created.** The scratch directory
+  can be moved with `HARNESS_TEST_TMP`, so "inside the scratch directory" is not ownership.
+  `own_workspace()` accepts only a root this run created with `mkdir`, or a path inside it. As
+  in the other suites, cases S1-S4 check that it:
+  - rejects the current directory;
+  - rejects the scratch root;
+  - accepts this run's root;
+  - rejects a sibling `run-*` directory.
+
 ## [1.25.4] - 2026-10-04
 
 ### Fixed
@@ -1274,6 +1294,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.25.5]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.5
 [1.25.4]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.4
 [1.25.3]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.3
 [1.25.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.2
