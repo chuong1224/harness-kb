@@ -38,6 +38,8 @@ DEMO = HERE.parent / "demo-vault"
 RULES_SRC = HERE.parent / "rules" / "rules.example.json"
 SCRIPT = HERE / "auto_fix.py"
 failures = 0
+TMP_PREFIX = "autofix-test-"
+OWNED = set()                   # roots this run created with its own mkdtemp
 
 
 def report(name, ok, detail=""):
@@ -51,11 +53,38 @@ def sha(p):
     return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 
 
+def own_temp(p):
+    """Accept only a sandbox root this run created (or a descendant); every deletion goes here.
+
+    "Under the temp dir with the right prefix" is not enough: a same-prefix directory of
+    another run that is still in use would pass that test."""
+    if p is None:
+        return False
+    try:
+        candidate = Path(p).resolve()
+        system_temp = Path(tempfile.gettempdir()).resolve()
+    except OSError:
+        return False
+    for owner in OWNED:
+        safe = (owner != system_temp and system_temp in owner.parents
+                and owner.name.startswith(TMP_PREFIX))
+        if safe and (candidate == owner or owner in candidate.parents):
+            return True
+    return False
+
+
+def wipe(p):
+    """Delete only directories owned by this test run; reject everything else."""
+    if own_temp(p):
+        shutil.rmtree(p, ignore_errors=True)
+
+
 class Sandbox:
     """A disposable copy of the demo vault plus its own backup store."""
 
     def __enter__(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="autofix-test-"))
+        self.tmp = Path(tempfile.mkdtemp(prefix=TMP_PREFIX))
+        OWNED.add(self.tmp.resolve())
         self.vault = self.tmp / "vault"
         shutil.copytree(DEMO, self.vault)
         self.rules = self.tmp / "rules.json"
@@ -64,7 +93,7 @@ class Sandbox:
         return self
 
     def __exit__(self, *exc):
-        shutil.rmtree(self.tmp, ignore_errors=True)
+        wipe(self.tmp)
 
     def run(self, *args, env_extra=None, script=SCRIPT):
         env = dict(os.environ)
@@ -113,6 +142,17 @@ def main():
     if not DEMO.is_dir() or not RULES_SRC.exists():
         report("environment", False, "demo-vault or rules.example.json missing")
         return 1
+
+    # S1-S4 - the deletion breaker (only the predicate is measured) ----------
+    with Sandbox() as box:
+        report("S1 - own_temp rejects the current directory",
+               not own_temp(Path()) and not own_temp(Path.cwd()))
+        report("S2 - own_temp rejects the system temp root",
+               not own_temp(tempfile.gettempdir()))
+        report("S3 - own_temp accepts this run's sandbox and its descendants",
+               own_temp(box.tmp) and own_temp(box.vault))
+        report("S4 - own_temp rejects a same-prefix directory from another run",
+               not own_temp(Path(tempfile.gettempdir()) / (TMP_PREFIX + "not-this-run")))
 
     # 1 + 2 + 7 --------------------------------------------------------------
     with Sandbox() as box:

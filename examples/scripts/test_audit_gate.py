@@ -44,6 +44,8 @@ HERE = Path(__file__).resolve().parent
 GATE = HERE / "audit_gate.py"
 
 fails: list = []
+TMP_PREFIX = "audit-gate-test-"
+temp_root = None                # set only from this run's own mkdtemp
 
 
 def check(name: str, cond: bool, info: str = "") -> None:
@@ -112,16 +114,58 @@ def run(vault: Path, state: Path | None, *args, payload=None, env=None, raw=None
 
 def touch(p: Path, text: str) -> None:
     """Push mtime forward. The fingerprint stores whole seconds, so two writes of equal
-    length inside one second look identical and the test would pass for the wrong reason."""
+    length inside one second look identical and the test would pass for the wrong reason.
+
+    "Now + 2s" alone is not enough: the previous touch of the same file also pushed it to
+    "then + 2s", and when the steps in between finish within a second both land on the same
+    whole second. Always move at least 2s past the file's own previous mtime."""
+    prev = p.stat().st_mtime if p.exists() else 0.0
     p.write_text(text, encoding="utf-8")
-    t = time.time() + 2
+    t = max(time.time(), prev) + 2
     os.utime(p, (t, t))
 
 
+
+def own_temp(p):
+    """Accept only paths owned by this exact test run; every deletion goes through here."""
+    if p is None or temp_root is None:
+        return False
+    try:
+        candidate = Path(p).resolve()
+        owner = temp_root.resolve()
+        system_temp = Path(tempfile.gettempdir()).resolve()
+    except OSError:
+        return False
+    owner_is_safe = (
+        owner != system_temp
+        and system_temp in owner.parents
+        and owner.name.startswith(TMP_PREFIX)
+    )
+    return owner_is_safe and (candidate == owner or owner in candidate.parents)
+
+
+def wipe(p):
+    """Delete only directories owned by this test run; reject everything else."""
+    if own_temp(p):
+        shutil.rmtree(p, ignore_errors=True)
+
+
 def main() -> int:
-    tmp = Path(tempfile.mkdtemp(prefix="audit-gate-test-"))
+    global temp_root
+    tmp = Path(tempfile.mkdtemp(prefix=TMP_PREFIX))
+    temp_root = tmp.resolve()
     vault, state, log = tmp / "vault", tmp / "state.json", tmp / "ran.log"
     try:
+        # Deletion breaker: only the predicate is measured, nothing dangerous is deleted.
+        print("0. deletion breaker")
+        check("S1. own_temp rejects the current directory",
+              not own_temp(Path()) and not own_temp(Path.cwd()))
+        check("S2. own_temp rejects the system temp root", not own_temp(tempfile.gettempdir()))
+        check("S3. own_temp accepts this run's root and descendants",
+              own_temp(tmp) and own_temp(vault))
+        check("S4. own_temp rejects a same-prefix directory from another run",
+              not own_temp(Path(tempfile.gettempdir()) / (TMP_PREFIX + "not-this-run")))
+
         build_vault(vault)
         print("Throwaway vault: %s" % vault)
 
@@ -256,7 +300,7 @@ def main() -> int:
         check("vault A acceptance cannot silence vault B",
               code == 2 and "same finding" in out, "exit=%d" % code)
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        wipe(tmp)
 
     print()
     print("RESULT: %s" % ("ALL PASS" if not fails else "FAIL %d - %s"

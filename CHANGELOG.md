@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.3] - 2026-10-04
+
+### Fixed
+- **The audit-gate suite failed about half of its runs after 1.25.2.** Case 7 is meant to
+  prove that a note change does not run the code suite. Since 1.25.2 it also requires that a
+  gate ran at all, and that requirement exposed a fixture bug that had always been there:
+  - `touch()` moved a file's mtime to "now + 2s";
+  - the previous touch of the same file had moved it to "then + 2s";
+  - when the steps in between finished within a second, both writes landed on the same
+    whole second with the same size. The fingerprint then saw no change, nothing ran, and the
+    old assertion passed on an empty run.
+
+  `touch()` now always moves at least 2s past the file's own previous mtime. Measured: 5 of 10
+  runs failed before the fix, 0 of 10 after it.
+- **Two suites still deleted their temp directories without the ownership breaker.**
+  `test_audit_gate.py` called a bare `rmtree`. `test_auto_fix.py` deleted any sandbox it was
+  handed. Both now delete only through `own_temp()`/`wipe()`, which accept only a root this
+  run created with its own `mkdtemp`, or a path inside such a root. Each suite gains cases
+  S1-S4, as in the claim and tooling-selfcheck suites:
+  - reject the current directory;
+  - reject the system temp root;
+  - accept this run's root;
+  - reject a same-prefix directory that belongs to another run.
+
 ## [1.25.2] - 2026-10-03
 
 ### Fixed
@@ -1232,6 +1256,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.25.3]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.3
 [1.25.2]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.2
 [1.25.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.1
 [1.25.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.0
