@@ -241,14 +241,35 @@ def load_state(path: Path) -> dict:
         return {}
 
 
-def save_state(path: Path, data: dict) -> None:
+def save_state(path: Path, data: dict) -> bool:
+    """Write the mark. A failed write must not break the gate (a lost cache only costs a
+    redundant run), but it returns False so that `accept` - the one path where a lost
+    write loses a decision - cannot report "accepted"."""
+    tmp = path.with_name(path.name + ".tmp-%d" % os.getpid())
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".tmp-%d" % os.getpid())
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(str(tmp), str(path))
+        return True
     except OSError:
-        pass                                     # a broken cache must not break the gate
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        return False
+
+
+def read_back_acceptance(path: Path, mark: dict) -> bool:
+    """Re-read the mark from DISK after `accept`: the counts and the record must be there.
+
+    A printed "accepted" is not evidence; the file is. Seen in practice: a write-up said
+    the mark was lowered while the state the real gate reads still held the old mark and
+    no record at all."""
+    st = load_state(path)
+    if st.get("counts") != mark.get("counts"):
+        return False
+    want = (mark.get("accepted") or [])[-1:]
+    return not want or (st.get("accepted") or [])[-1:] == want
 
 
 def stale(vault: Path, path: Path):
@@ -568,6 +589,12 @@ def cmd_run(args, vault: Path, details=None) -> int:
 
     lf, got = _busy_lock(sp)
     if not got:
+        if (getattr(args, "reason", "") or "").strip():
+            # Skipping a `run` is harmless (the next one catches up). Skipping an `accept`
+            # with exit 0 reads as "accepted" to the caller while nothing was written.
+            print("NOT ACCEPTED: another runner is active on this machine - nothing was"
+                  " written. Re-run `accept` when it finishes.", file=sys.stderr)
+            return 2
         if not args.json:
             print("Skipping this round: another runner is active on this machine.")
         return 0
@@ -597,6 +624,7 @@ def cmd_run(args, vault: Path, details=None) -> int:
         dropped, vanished = (coverage_delta(mark_old, counts, {t.name for t in tests})
                              if clean else ([], []))
         mute = [r["test"] for r in results if is_mute(r)]
+        accepted_ok = False                      # True only once read back from disk
         if details is not None:
             # So the Stop hook can name the actual cause instead of saying "something is
             # red" - the four causes have four different repairs.
@@ -636,7 +664,9 @@ def cmd_run(args, vault: Path, details=None) -> int:
                 mark["accepted"] = history[-5:]
             elif st_old.get("accepted"):
                 mark["accepted"] = st_old["accepted"]
-            save_state(sp, mark)
+            saved = save_state(sp, mark)
+            if reason and (dropped or vanished):
+                accepted_ok = saved and read_back_acceptance(sp, mark)
 
         if no_lib and not args.json:
             print("\n" + "=" * 72, file=sys.stderr)
@@ -672,8 +702,10 @@ def cmd_run(args, vault: Path, details=None) -> int:
             print("  'green' here means the REST is green, not that everything was measured.")
         if (dropped or vanished) and not args.json:
             print("\n" + "=" * 72, file=sys.stderr)
-            if reason:
+            if reason and accepted_ok:
                 print("COVERAGE FELL - ACCEPTED: %s" % reason, file=sys.stderr)
+            elif reason:
+                print("COVERAGE FELL - NOT ACCEPTED: %s" % reason, file=sys.stderr)
             else:
                 print("COVERAGE FELL - every suite is green, but they measured LESS than at"
                       " the last green run:", file=sys.stderr)
@@ -683,6 +715,19 @@ def cmd_run(args, vault: Path, details=None) -> int:
             for t in vanished:
                 print("   - %s: the whole SUITE is gone from disk (last mark: %d assertions)"
                       % (t, mark_old.get(t, 0)), file=sys.stderr)
+            if reason and accepted_ok:
+                print("   Record read back from: %s" % sp, file=sys.stderr)
+                print("   Interpreter: %s - every other interpreter on this machine keeps its"
+                      " own mark and must accept separately." % sys.executable,
+                      file=sys.stderr)
+            elif reason and clean and not mute:
+                print("   COULD NOT SAVE the record (write failed or read-back mismatch): %s"
+                      % sp, file=sys.stderr)
+                print("   The old mark still stands - the next run blocks again. Check that"
+                      " file is writable and re-run.", file=sys.stderr)
+            elif reason:
+                print("   This run was not clean, so NOTHING was written - fix the red/mute"
+                      " suite and re-run `accept`.", file=sys.stderr)
             if not reason:
                 print("   Green while measuring less = a silent skip, or assertions deleted."
                       " There is no", file=sys.stderr)
@@ -712,7 +757,7 @@ def cmd_run(args, vault: Path, details=None) -> int:
 
         if args.json:
             print(json.dumps({"ok": clean and not mute
-                              and (not (dropped or vanished) or bool(reason)),
+                              and (not (dropped or vanished) or accepted_ok),
                               "seconds": round(time.perf_counter() - t0, 1),
                               "missing_libs": mods,
                               "locked_files": {r["test"]: locked_file(r) for r in locked},
@@ -753,7 +798,20 @@ def cmd_run(args, vault: Path, details=None) -> int:
         # different admissions: lowering a mark says coverage fell for a reason, while
         # silence says the instrument never reached that suite at all - "accepting" that
         # is agreeing to let it drift forever. The fix costs one print statement.
-        coverage_blocks = bool(dropped or vanished) and not reason
+        #
+        # "Accepted" means the record READ BACK from disk, not that --reason was passed. A
+        # failed write on an otherwise clean run exits 2 (environment), apart from 1 (red).
+        if reason and not args.json and not (dropped or vanished) and clean and not mute:
+            print("\nNOTHING TO ACCEPT: coverage did not fall against the mark at %s - no"
+                  " acceptance record written.\n   Interpreter: %s. If another gate still"
+                  " blocks, it is reading a different mark file (other interpreter/machine)."
+                  % (sp, sys.executable))
+        if reason and not args.json and not clean:
+            print("\nNOT ACCEPTED: this run was not clean (red / missing library / held"
+                  " document) - nothing was written.", file=sys.stderr)
+        coverage_blocks = bool(dropped or vanished) and not accepted_ok
+        if coverage_blocks and reason and clean and not mute:
+            return 2
         return 1 if (bad or no_lib or locked or coverage_blocks or mute) else 0
     finally:
         _unlock(lf)

@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.6] - 2026-10-14
+
+### Fixed
+- **`tooling_selfcheck.py accept` could say "accepted" when nothing was saved.** A
+  write-up recorded a lowered coverage mark, but the state the real gate reads still held
+  the old mark and no record. Four paths led there:
+  - `save_state()` swallowed a failed write, and the run still printed
+    `COVERAGE FELL - ACCEPTED` with exit 0;
+  - when another runner held the lock, `accept` printed "Skipping this round" with exit 0;
+  - a run that was not clean wrote nothing, and nothing said so at the `accept` call;
+  - `accept` with nothing fallen stayed silent about which mark file it compared against.
+
+  `accept` now reads the mark back from disk and prints `ACCEPTED` only when the counts and
+  the record are there. It names the mark file and the interpreter, because each interpreter
+  keeps its own mark and must accept separately. A failed write prints `COULD NOT SAVE` and
+  exits 2. A busy lock prints `NOT ACCEPTED` and exits 2. A run that is not clean says
+  nothing was written. With nothing fallen, `accept` prints `NOTHING TO ACCEPT` and the mark
+  file. The `run` and Stop-hook paths behave as before.
+- **Four new cases, 29b-29e, in `test_tooling_selfcheck.py`.** The failed-write case uses a
+  real read-only mark file, not a test-only switch. It prints `[SKIP]` where the operating
+  system lets `os.replace` overwrite a read-only file. All four cases failed on the old code
+  and pass on the fix.
+
 ## [1.25.5] - 2026-10-04
 
 ### Fixed
@@ -1294,6 +1317,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.25.6]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.6
 [1.25.5]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.5
 [1.25.4]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.4
 [1.25.3]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.3

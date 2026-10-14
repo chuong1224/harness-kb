@@ -324,6 +324,66 @@ def main() -> int:
         report("29. after accepting, the lowered count is the new baseline",
                code == 0 and "ALL PASS" in out, out)
 
+        # "Accepted" must mean the record can be READ BACK from the mark file. Seen in
+        # practice: a write-up said the mark was lowered, while the state the real gate
+        # reads still held the old mark and no record at all.
+        write_test("test_rollup.py", "print('PASS 5/7')\n")          # 7 -> 5: needs accept
+        spec_acc = importlib.util.spec_from_file_location("gate_accept", SCRIPT)
+        gate_acc = importlib.util.module_from_spec(spec_acc)
+        spec_acc.loader.exec_module(gate_acc)
+        lf, held = gate_acc._busy_lock(state)
+        try:
+            code, out = run(base("accept", "--reason", "runner busy"))
+        finally:
+            gate_acc._unlock(lf)
+        report("29b. another runner holds the lock -> accept exits 2 and does NOT claim it",
+               held and code == 2 and "NOT ACCEPTED" in out
+               and mark().get("counts", {}).get("test_rollup.py") == 7, out)
+
+        # A real failed write (read-only mark file), not a test-only switch: the old
+        # save_state swallowed the OSError and the run still printed "ACCEPTED", exit 0.
+        import stat as _stat
+        probe = state.with_name("probe-readonly.json")
+        probe.write_text("{}", encoding="utf-8")
+        os.chmod(str(probe), _stat.S_IREAD)
+        src = state.with_name("probe-src.json")
+        src.write_text("{}", encoding="utf-8")
+        try:
+            os.replace(str(src), str(probe))
+            blocks = False
+        except OSError:
+            blocks = True
+        finally:
+            os.chmod(str(probe), _stat.S_IWRITE | _stat.S_IREAD)
+            probe.unlink(missing_ok=True)
+            src.unlink(missing_ok=True)
+        if not blocks:
+            print("[SKIP] 29c. this OS lets os.replace overwrite a read-only file - cannot"
+                  " stage a failed write (POSIX/root)")
+        else:
+            before = state.read_bytes()
+            os.chmod(str(state), _stat.S_IREAD)
+            try:
+                code, out = run(base("accept", "--reason", "write fails"))
+            finally:
+                os.chmod(str(state), _stat.S_IWRITE | _stat.S_IREAD)
+            report("29c. a failed mark write -> accept exits 2, says COULD NOT SAVE, mark"
+                   " file unchanged byte for byte",
+                   code == 2 and "COULD NOT SAVE" in out and "- ACCEPTED" not in out
+                   and state.read_bytes() == before, out)
+
+        code, out = run(base("accept", "--reason", "rollup trimmed"))
+        report("29d. a successful accept names the mark file it read the record back from",
+               code == 0 and "- ACCEPTED" in out and str(state) in out
+               and (mark().get("accepted") or [{}])[-1].get("reason") == "rollup trimmed",
+               out)
+
+        n_records = len(mark().get("accepted") or [])
+        code, out = run(base("accept", "--reason", "nothing fell"))
+        report("29e. accept with nothing fallen says so, names the mark, writes no record",
+               code == 0 and "NOTHING TO ACCEPT" in out and str(state) in out
+               and len(mark().get("accepted") or []) == n_records, out)
+
         code, out = run(base("accept"))
         report("30. accept with no reason is refused, never defaulted",
                code == 2 and "requires --reason" in out, out)
