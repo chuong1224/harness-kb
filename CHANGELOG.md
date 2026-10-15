@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.1] - 2026-10-15
+
+### Fixed
+- **`test_drift_check.py` did not test the two sweeps that only warn.** `check_rules_drift.py`
+  warns when a document still mentions a retired tag, and when a hand-typed count without a
+  marker disagrees with the source. Switching either check off left every case green: a
+  warning keeps the exit code at 0, and no case looked for the warning text.
+- **Two new cases, with a `warn_case` helper.** Each case adds one line to the rules document
+  and demands exit 0, the warning text present, and the same text absent from the untouched
+  baseline. Without the last part, a dead check would pass whenever another line already
+  printed the same words. Both cases fail with the check switched off and pass on the
+  shipped checker. The checker itself is unchanged.
+
 ## [1.26.0] - 2026-10-15
 
 ### Added
@@ -1337,6 +1350,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.26.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.26.1
 [1.26.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.26.0
 [1.25.6]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.6
 [1.25.5]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.5

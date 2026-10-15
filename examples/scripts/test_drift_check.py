@@ -77,6 +77,22 @@ def clean_case(name, mutate):
         report(name, code == 0, out)
 
 
+def warn_case(name, mutate, expected, baseline_out):
+    """A warning keeps the exit code at 0, so the exit code proves nothing here. Demand the
+    warning appears after the mutation AND is absent from the untouched baseline - otherwise
+    a dead check passes because some other line already happened to print the same text."""
+    with tempfile.TemporaryDirectory() as tmp:
+        vault, rules = sandbox(Path(tmp))
+        mutate(vault, rules)
+        code, out = run(vault, rules)
+        report(name, code == 0 and expected in out and expected not in baseline_out, out)
+
+
+def append_to(path: Path, text: str):
+    with open(path, "a", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+
+
 def write_note(path: Path, text: str):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -104,6 +120,22 @@ def main() -> int:
         vault, rules = sandbox(Path(tmp))
         code, out = run(vault, rules)
         report("baseline: unmodified demo vault has no drift", code == 0, out)
+        baseline_out = out
+
+    # The two sweeps that only WARN. Switching either off left every case green before.
+    warn_case(
+        "an unmarked hand-typed count that disagrees with the source is flagged",
+        lambda v, r: append_to(v / RULES_DOC, "\nSmoke test: the vault has 97 areas.\n"),
+        "unmarked number disagrees with the source (97 area)",
+        baseline_out,
+    )
+    dead = json.loads(RULES.read_text(encoding="utf-8"))["documents"]["retired_tags"][0]
+    warn_case(
+        "a document that still mentions a retired tag is flagged",
+        lambda v, r: append_to(v / RULES_DOC, "\nSmoke test: the `%s` tag is here.\n" % dead),
+        "still mentions retired tag '%s'" % dead,
+        baseline_out,
+    )
 
     case(
         "document states the wrong tag count",
