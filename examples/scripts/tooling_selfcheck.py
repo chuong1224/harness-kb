@@ -446,6 +446,28 @@ def is_mute(res: dict) -> bool:
     return bool(res.get("ok")) and not count_assertions(res) and not skips(res)
 
 
+def is_double_count(res: dict) -> bool:
+    """A DOUBLE-COUNTING suite: it prints a `[PASS]` label for every assertion AND a roll-up
+    `PASS n/m` that totals those same assertions.
+
+    `count_assertions` adds both, so the suite reports 2n. In the private vault this hid in
+    ten suites at once (447 reported, 257 real), and deleting ONE assertion made coverage
+    fall by two - the mark was inflated, so the gate guarded a fictional number.
+
+    The runner cannot know whether a roll-up overlaps the labels, so it uses a floor: when the
+    labels outside the roll-up are at least the roll-up's left side, the roll-up is almost
+    certainly recounting them. A deliberate mix (a few labelled guard cases plus a roll-up for
+    bare `assert`s, e.g. 4 labels + `PASS 11/11`) has fewer labels than the left side and is
+    left alone.
+
+    Green suites only, for the same reason as `is_mute`: a red one is blocked elsewhere."""
+    out = res.get("output") or ""
+    rollups = [int(n) for n in ROLLUP_RE.findall(out)]
+    if not res.get("ok") or not sum(rollups):
+        return False
+    return len(ASSERTION_RE.findall(out)) - len(rollups) >= sum(rollups)
+
+
 def coverage_delta(old: dict, new: dict, on_disk) -> tuple:
     """Compare against the last green mark. Returns (dropped, vanished).
 
@@ -624,6 +646,11 @@ def cmd_run(args, vault: Path, details=None) -> int:
         dropped, vanished = (coverage_delta(mark_old, counts, {t.name for t in tests})
                              if clean else ([], []))
         mute = [r["test"] for r in results if is_mute(r)]
+        # A double-counting suite blocks exactly like a mute one (same doors, and the same
+        # refusal to go through `accept`): both are a broken measurement, not coverage that
+        # fell for a reason.
+        double = [r["test"] for r in results if is_double_count(r)]
+        miscounted = mute + double
         accepted_ok = False                      # True only once read back from disk
         if details is not None:
             # So the Stop hook can name the actual cause instead of saying "something is
@@ -635,7 +662,8 @@ def cmd_run(args, vault: Path, details=None) -> int:
                             "locked": [r["test"] for r in locked],
                             "locked_files": sorted({locked_file(r) for r in locked}),
                             "coverage_dropped": [t for t, _a, _b in dropped],
-                            "vanished": list(vanished), "mute": list(mute)})
+                            "vanished": list(vanished), "mute": list(mute),
+                            "double_count": list(double)})
 
         # `vanished` has to survive this door: a vault whose suites were all deleted also
         # lands in "no suites found", and returning 0 here is silence at the exact moment
@@ -647,7 +675,7 @@ def cmd_run(args, vault: Path, details=None) -> int:
                             "runtime": runtime_fingerprint(),
                             "signature": signature(vault)})
             return 0
-        if clean and not mute and (not (dropped or vanished) or reason):
+        if clean and not miscounted and (not (dropped or vanished) or reason):
             mark = {"last_ok": time.time(), "host": HOST, "tests": len(results),
                     "skipped": skipped_items, "counts": counts,
                     "runtime": runtime_fingerprint(),
@@ -720,7 +748,7 @@ def cmd_run(args, vault: Path, details=None) -> int:
                 print("   Interpreter: %s - every other interpreter on this machine keeps its"
                       " own mark and must accept separately." % sys.executable,
                       file=sys.stderr)
-            elif reason and clean and not mute:
+            elif reason and clean and not miscounted:
                 print("   COULD NOT SAVE the record (write failed or read-back mismatch): %s"
                       % sp, file=sys.stderr)
                 print("   The old mark still stands - the next run blocks again. Check that"
@@ -754,9 +782,22 @@ def cmd_run(args, vault: Path, details=None) -> int:
             print("   gaps get `[SKIP] <reason>` - once declared, a suite is no longer mute.",
                   file=sys.stderr)
             print("=" * 72, file=sys.stderr)
+        if double and not args.json:
+            print("\n" + "=" * 72, file=sys.stderr)
+            print("DOUBLE-COUNTING SUITE(S) - %d print a `[PASS]` label per assertion AND a"
+                  " roll-up `PASS n/m`:" % len(double), file=sys.stderr)
+            for t in double:
+                print("   - %s" % t, file=sys.stderr)
+            print("   The gate adds both, so the coverage mark is twice the real number and"
+                  " deleting one", file=sys.stderr)
+            print("   assertion makes it fall by two. Fix: drop the roll-up, keep the labels;"
+                  " print any", file=sys.stderr)
+            print("   summary in other words, e.g. `Total: n assertions green`.",
+                  file=sys.stderr)
+            print("=" * 72, file=sys.stderr)
 
         if args.json:
-            print(json.dumps({"ok": clean and not mute
+            print(json.dumps({"ok": clean and not miscounted
                               and (not (dropped or vanished) or accepted_ok),
                               "seconds": round(time.perf_counter() - t0, 1),
                               "missing_libs": mods,
@@ -766,6 +807,7 @@ def cmd_run(args, vault: Path, details=None) -> int:
                               "coverage_dropped": [{"test": t, "was": a, "now": b}
                                                    for t, a, b in dropped],
                               "vanished": list(vanished), "mute": mute,
+                              "double_count": double,
                               "results": [{k: v for k, v in r.items() if k != "output"}
                                           for r in results]}, ensure_ascii=False, indent=1))
         else:
@@ -786,7 +828,8 @@ def cmd_run(args, vault: Path, details=None) -> int:
                 + (" - %d assertions" % sum(counts.values()))
                 + ("" if not (dropped or vanished) else
                    " - COVERAGE FELL in %d suite(s)" % (len(dropped) + len(vanished)))
-                + ("" if not mute else " - %d MUTE" % len(mute))))
+                + ("" if not mute else " - %d MUTE" % len(mute))
+                + ("" if not double else " - %d DOUBLE-COUNTED" % len(double))))
 
         # Coverage loss BLOCKS, like a red suite. Reporting without blocking would rebuild
         # the very silent channel this measurement exists to close: on the Stop-hook path,
@@ -801,7 +844,8 @@ def cmd_run(args, vault: Path, details=None) -> int:
         #
         # "Accepted" means the record READ BACK from disk, not that --reason was passed. A
         # failed write on an otherwise clean run exits 2 (environment), apart from 1 (red).
-        if reason and not args.json and not (dropped or vanished) and clean and not mute:
+        if reason and not args.json and not (dropped or vanished) and clean \
+                and not miscounted:
             print("\nNOTHING TO ACCEPT: coverage did not fall against the mark at %s - no"
                   " acceptance record written.\n   Interpreter: %s. If another gate still"
                   " blocks, it is reading a different mark file (other interpreter/machine)."
@@ -810,9 +854,9 @@ def cmd_run(args, vault: Path, details=None) -> int:
             print("\nNOT ACCEPTED: this run was not clean (red / missing library / held"
                   " document) - nothing was written.", file=sys.stderr)
         coverage_blocks = bool(dropped or vanished) and not accepted_ok
-        if coverage_blocks and reason and clean and not mute:
+        if coverage_blocks and reason and clean and not miscounted:
             return 2
-        return 1 if (bad or no_lib or locked or coverage_blocks or mute) else 0
+        return 1 if (bad or no_lib or locked or coverage_blocks or miscounted) else 0
     finally:
         _unlock(lf)
 
@@ -888,6 +932,10 @@ def cmd_hook_stop(args) -> int:
         headline = "a tooling suite ran green while asserting NOTHING (%s)" \
                    % ", ".join(details["mute"][:3])
         repair = "Print one line per assertion, or declare the gap with [SKIP]."
+    elif details.get("double_count"):
+        headline = "a tooling suite counts its assertions TWICE - labels plus a roll-up (%s)" \
+                   % ", ".join(details["double_count"][:3])
+        repair = "Drop the `PASS n/m` roll-up and keep one `[PASS]` label per assertion."
     elif details.get("coverage_dropped") or details.get("vanished"):
         headline = "tooling test COVERAGE fell since the last green run"
         repair = 'Restore it, or lower the mark on the record: accept --reason "..."'

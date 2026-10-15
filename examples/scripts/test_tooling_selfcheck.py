@@ -418,6 +418,33 @@ def main() -> int:
         report("36. a RED suite that printed nothing is reported red, not mute",
                code == 1 and "MUTE" not in out, out)
 
+        # --- the value that is counted twice ----------------------------------------
+        # Case 22 asks about a roll-up standing alone. Nothing mixed both spellings, so a
+        # suite printing a label per assertion AND a roll-up of the same assertions was
+        # silently counted 2n.
+        reset()
+        write_test("test_double.py",
+                   "for t in ('a', 'b', 'c'):\n    print('[PASS] ' + t)\n"
+                   "print('PASS 3/3')\n")
+        code, out = run(base("run"))
+        report("36b. labels per assertion PLUS a roll-up of them -> refused as DOUBLE-COUNTED",
+               code == 1 and "DOUBLE-COUNTING SUITE" in out and "test_double.py" in out
+               and "1 DOUBLE-COUNTED" in out, out)
+        report("36c. a double-counting run records no green mark (it would be twice the truth)",
+               not state.is_file(), str(state))
+        code, out = run(base("hook-stop"), stdin=stop_payload())
+        report("36d. hook-stop blocks on it and `accept` is no way out",
+               code == 2 and "TWICE" in out and "test_double.py" in out
+               and run(base("accept", "--reason", "let it be"))[0] == 1, out)
+        # A deliberate mix: four labelled guard cases plus a roll-up for bare asserts. Fewer
+        # labels than the roll-up's left side, so they cannot be the same assertions.
+        write_test("test_double.py",
+                   "for t in ('S1', 'S2', 'S3', 'S4'):\n    print('[PASS] ' + t)\n"
+                   "print('PASS 11/11')\n")
+        code, out = run(base("run"))
+        report("36e. 4 guard labels + `PASS 11/11` is a deliberate mix -> not flagged, counts 15",
+               code == 0 and "DOUBLE-COUNT" not in out and "15 assertions" in out, out)
+
         # --- broken measurement: a missing library ----------------------------------
         reset()
         write_test("test_ok.py", TEST_OK)

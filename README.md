@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.25.6-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.26.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
@@ -261,7 +261,9 @@ python examples/scripts/tooling_selfcheck.py run --vault /path/to/your/vault
 #    vaults on one host do not share coverage history. --state opts into sharing explicitly.
 
 # 5b. It also counts each suite's assertions and blocks when that number falls. When the
-#     drop is deliberate, lower the mark on the record instead of switching the gate off:
+#     drop is deliberate, lower the mark on the record instead of switching the gate off.
+#     A suite that asserts nothing, or counts each assertion twice (a `[PASS]` label per
+#     assertion plus a `PASS n/m` roll-up of the same ones), is refused outright:
 python examples/scripts/tooling_selfcheck.py accept --reason "merged two redundant cases" \
     --vault /path/to/your/vault
 

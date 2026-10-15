@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] - 2026-10-15
+
+### Added
+- **`tooling_selfcheck.py` refuses a suite that counts its assertions twice.** A suite that
+  prints a `[PASS]` label for every assertion and then a roll-up `PASS n/m` of the same
+  assertions was counted 2n: `count_assertions` adds the labels and the roll-up's left side.
+  The coverage mark was inflated, and deleting one assertion made it fall by two. In the
+  private vault this hid in ten suites at once: 447 assertions reported, 257 real.
+
+  The runner cannot know whether a roll-up overlaps the labels, so it uses a floor. When the
+  labels outside the roll-up are at least the roll-up's left side, the suite is reported as
+  `DOUBLE-COUNTING`. It blocks exactly like a mute suite: no green mark is written, `run`
+  exits 1, the Stop hook exits 2 and names the suite, and `accept` is no way out, because
+  this is a broken measurement, not coverage that fell for a reason. A deliberate mix, such
+  as four labelled guard cases plus `PASS 11/11` for bare asserts, has fewer labels than the
+  roll-up's left side and is not flagged.
+- **Four new cases, 36b-36e, in `test_tooling_selfcheck.py`.** 36b-36d failed on the old
+  code (the toy suite with three assertions was counted as six) and pass on the change. 36e
+  is the negative control for the deliberate mix; it fails if the floor is lowered.
+
 ## [1.25.6] - 2026-10-14
 
 ### Fixed
@@ -1317,6 +1337,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.26.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.26.0
 [1.25.6]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.6
 [1.25.5]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.5
 [1.25.4]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.4
