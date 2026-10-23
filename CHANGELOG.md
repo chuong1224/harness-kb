@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0] - 2026-10-23
+
+### Added
+- **`tooling_selfcheck.py` refuses assertions that cannot fail.** Every earlier door asks
+  whether a suite ran, spoke, or shrank; none asks whether it can catch anything. A suite
+  that prints `[PASS]` after comparing nothing was counted as coverage and then locked into
+  the mark. A review checklist covers this, but it only binds the agents that load it.
+
+  The runner now parses each suite it just ran and flags exactly three shapes that cannot
+  mean anything: a constant assert (`assert True`, `assertTrue(1)`), a call-free value
+  compared with itself (`x == x`, `assertEqual(x, x)`), and `report(name, True)` on a
+  straight-line path. It blocks like a mute suite: no green mark is written, `run` exits 1,
+  the Stop hook exits 2 and names the file and line, and `accept` is no way out. A constant
+  inside try/except, if, while, with or and/or is left alone, because there the control flow
+  is the comparison; so are `f() == f()` (determinism), `x != x` (NaN probe) and `True` as an
+  argument. An expectation computed by the function under test through a variable is not
+  caught: syntax cannot tell it from a real test, and one false alarm gets a gate switched off.
+- **Four new cases, 36f-36i, in `test_tooling_selfcheck.py`.** 36f-36h failed on the old
+  code (a toy suite with five junk lines ran `ALL PASS`) and pass on the change. 36i is the
+  negative control; three deliberate mutations of the scanner each turn it red.
+
 ## [1.26.1] - 2026-10-15
 
 ### Fixed
@@ -1350,6 +1371,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.27.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.27.0
 [1.26.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.26.1
 [1.26.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.26.0
 [1.25.6]: https://github.com/chuong1224/harness-kb/releases/tag/v1.25.6

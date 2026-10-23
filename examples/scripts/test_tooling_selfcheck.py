@@ -445,6 +445,49 @@ def main() -> int:
         report("36e. 4 guard labels + `PASS 11/11` is a deliberate mix -> not flagged, counts 15",
                code == 0 and "DOUBLE-COUNT" not in out and "15 assertions" in out, out)
 
+        # --- assertions that cannot fail ---------------------------------------------
+        # Every door above asks whether a suite ran, spoke, or shrank. This suite speaks,
+        # passes, counts five assertions - and catches nothing. Lines 4-8 are one shape each.
+        reset()
+        write_test("test_junk.py",
+                   "def report(t, ok):\n    print(('[PASS] ' if ok else '[FAIL] ') + t)\n"
+                   "x, t = 1, type('T', (), {'assertEqual': lambda s, a, b: report('eq', a == b),"
+                   " 'assertTrue': lambda s, a: report('true', a)})()\n"
+                   "assert True\n"
+                   "report('self', x == x)\n"
+                   "report('const', True)\n"
+                   "t.assertEqual(x, x)\n"
+                   "t.assertTrue(1)\n")
+        code, out = run(base("run"))
+        report("36f. constant assert / self-comparison / constant PASS -> refused as JUNK, by line",
+               code == 1 and "1 JUNK" in out
+               and all(s in out for s in ("test_junk.py line 4: constant assert",
+                                          "test_junk.py line 5: compared with itself",
+                                          "test_junk.py line 6: constant PASS",
+                                          "test_junk.py line 7: compared with itself",
+                                          "test_junk.py line 8: constant assert")), out)
+        report("36g. a run with junk assertions records no green mark",
+               not state.is_file(), str(state))
+        code, out = run(base("hook-stop"), stdin=stop_payload())
+        report("36h. hook-stop blocks on it and `accept` is no way out",
+               code == 2 and "CANNOT FAIL" in out and "test_junk.py line 6" in out
+               and run(base("accept", "--reason", "let it be"))[0] == 1, out)
+        # Negative control: shapes that ARE real tests - the control flow is the comparison,
+        # two calls are a determinism check, `!=` probes NaN, `True` is an argument.
+        write_test("test_junk.py",
+                   "def report(t, ok):\n    print(('[PASS] ' if ok else '[FAIL] ') + t)\n"
+                   "def f(a=None, b=None):\n    return 1\n"
+                   "try:\n    int('x')\nexcept ValueError:\n    report('raises', True)\n"
+                   "else:\n    report('raises', False)\n"
+                   "if f() == 1:\n    report('branch', True)\n"
+                   "nan = float('nan')\n"
+                   "report('nan', nan != nan)\n"
+                   "report('determinism', f() == f())\n"
+                   "report('argument', f(True, True) == 1)\n")
+        code, out = run(base("run"))
+        report("36i. try/except, if, f()==f(), x!=x, True as an argument -> not junk",
+               code == 0 and "JUNK" not in out, out)
+
         # --- broken measurement: a missing library ----------------------------------
         reset()
         write_test("test_ok.py", TEST_OK)

@@ -1,10 +1,11 @@
 {
   "schema_version": 1,
   "product": "harness-kb",
-  "version": "1.26.1",
+  "version": "1.27.0",
   "repository": "https://github.com/chuong1224/harness-kb",
   "default_cache_seconds": 86400,
   "migration_impact": [
+    "The tooling selfcheck now parses each suite it ran and refuses three assertion shapes that cannot fail: a constant assert, a call-free value compared with itself, and report(name, True) on a straight-line path; rewrite them against an independent expected value or delete them.",
     "The tooling selfcheck now refuses a suite that prints both a [PASS] label per assertion and a PASS n/m roll-up of the same assertions; drop the roll-up and keep the labels.",
     "The tooling selfcheck's default machine cache is now namespaced by both the canonical vault root and the Python runtime; old vault-only marks are not migrated, and each interpreter establishes its own fresh green mark.",
     "The audit gate's default machine cache is namespaced by a stable hash of the canonical vault root; hostname-only baseline files are not migrated, and each vault establishes a fresh baseline.",

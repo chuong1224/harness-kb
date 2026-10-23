@@ -86,6 +86,7 @@ Python 3.8+, standard library only.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -468,6 +469,98 @@ def is_double_count(res: dict) -> bool:
     return len(ASSERTION_RE.findall(out)) - len(rollups) >= sum(rollups)
 
 
+# unittest assertions, recognised by method name.
+_ASSERT_EQUAL = {"assertEqual", "assertEquals", "assertIs", "assertCountEqual",
+                 "assertDictEqual", "assertListEqual", "assertTupleEqual", "assertSetEqual"}
+_ASSERT_TRUE = {"assertTrue", "assert_"}
+# Constructs that turn a constant into a real check: `try: f() / except X: report(..., True)`
+# or `if cond: report(..., True) else: report(..., False)` - the control flow IS the check.
+_BRANCHES = tuple(getattr(ast, n) for n in ("Try", "If", "IfExp", "Match", "While", "BoolOp",
+                                             "With") if hasattr(ast, n))
+
+
+def _static_expr(n) -> bool:
+    """An expression with no call in it: reading it twice gives the same value. `f() == f()`
+    is NOT one - comparing two calls is a determinism check, a real contract."""
+    if isinstance(n, (ast.Name, ast.Constant)):
+        return True
+    if isinstance(n, ast.Attribute):
+        return _static_expr(n.value)
+    if isinstance(n, ast.Subscript):
+        return _static_expr(n.value) and _static_expr(n.slice)
+    return False
+
+
+def _same_expr(a, b) -> bool:
+    return _static_expr(a) and ast.dump(a) == ast.dump(b)
+
+
+def _is_assertion_name(n) -> bool:
+    """The first argument is an assertion NAME: a string, an f-string, or `"..." % x`."""
+    if isinstance(n, ast.Constant):
+        return isinstance(n.value, str)
+    if isinstance(n, ast.JoinedStr):
+        return True
+    return (isinstance(n, ast.BinOp) and isinstance(n.op, ast.Mod)
+            and isinstance(n.left, ast.Constant) and isinstance(n.left.value, str))
+
+
+def junk_assertions(path) -> list:
+    """Parse a suite and return the lines that match a CERTAIN junk-test shape.
+
+    Every other door measures whether a suite ran, spoke, or shrank - none asks whether it
+    can catch anything. A review discipline for that exists, but it only binds the agents
+    that load it. This layer catches, mechanically, exactly three shapes that cannot mean
+    anything, and stops there on purpose - one false alarm and the gate gets switched off:
+
+      - constant assert - `assert True`, `self.assertTrue(1)`: compares nothing;
+      - self-comparison - `x == x`, `a.b is a.b`, `assertEqual(x, x)` on a call-free
+                          expression: the expected value is the value under test;
+      - constant PASS   - `report("name", True)` on a straight-line path: prints `[PASS]`
+                          unconditionally. Inside try/if/while/with/and-or it does NOT count,
+                          because the control flow is the comparison
+                          (`except SystemExit: report(..., True)` is a real test).
+
+    Deliberately left out: `f(x) == f(x)` (determinism), `x != x` (NaN probe), and an
+    expectation computed by the function under test through an intermediate variable -
+    syntax cannot tell those from real tests. A file that does not parse returns nothing:
+    that belongs to the red door."""
+    try:
+        tree = ast.parse(Path(path).read_text(encoding="utf-8", errors="replace"))
+    except (OSError, SyntaxError, ValueError):
+        return []
+    hits = []
+
+    def walk(node, in_branch: bool):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            in_branch = False                    # a function body is a fresh path
+        if isinstance(node, ast.Assert) and isinstance(node.test, ast.Constant) \
+                and node.test.value:
+            hits.append((node.lineno, "constant assert"))
+        elif isinstance(node, ast.Compare) and len(node.ops) == 1 \
+                and isinstance(node.ops[0], (ast.Eq, ast.Is, ast.GtE, ast.LtE)) \
+                and _same_expr(node.left, node.comparators[0]):
+            hits.append((node.lineno, "compared with itself"))
+        elif isinstance(node, ast.Call):
+            f = node.func
+            name = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", "")
+            a = node.args
+            if name in _ASSERT_EQUAL and len(a) >= 2 and _same_expr(a[0], a[1]):
+                hits.append((node.lineno, "compared with itself"))
+            elif name in _ASSERT_TRUE and a and isinstance(a[0], ast.Constant) and a[0].value:
+                hits.append((node.lineno, "constant assert"))
+            elif not in_branch and len(a) >= 2 and _is_assertion_name(a[0]) \
+                    and isinstance(a[1], ast.Constant) and a[1].value is True:
+                hits.append((node.lineno, "constant PASS"))
+        child_branch = in_branch or isinstance(node, _BRANCHES) \
+            or (isinstance(node, (ast.For, ast.AsyncFor)) and bool(node.orelse))
+        for child in ast.iter_child_nodes(node):
+            walk(child, child_branch)
+
+    walk(tree, False)
+    return ["line %d: %s" % (n, k) for n, k in sorted(set(hits))]
+
+
 def coverage_delta(old: dict, new: dict, on_disk) -> tuple:
     """Compare against the last green mark. Returns (dropped, vanished).
 
@@ -650,7 +743,11 @@ def cmd_run(args, vault: Path, details=None) -> int:
         # refusal to go through `accept`): both are a broken measurement, not coverage that
         # fell for a reason.
         double = [r["test"] for r in results if is_double_count(r)]
-        miscounted = mute + double
+        # Junk assertions block at the same door: an assertion that cannot fail adds a fake
+        # number to coverage, and accepting it would lock that number into the mark.
+        junk = {r["test"]: junk_assertions(r["path"]) for r in results}
+        junk = {t: hits for t, hits in junk.items() if hits}
+        miscounted = mute + double + sorted(junk)
         accepted_ok = False                      # True only once read back from disk
         if details is not None:
             # So the Stop hook can name the actual cause instead of saying "something is
@@ -663,7 +760,7 @@ def cmd_run(args, vault: Path, details=None) -> int:
                             "locked_files": sorted({locked_file(r) for r in locked}),
                             "coverage_dropped": [t for t, _a, _b in dropped],
                             "vanished": list(vanished), "mute": list(mute),
-                            "double_count": list(double)})
+                            "double_count": list(double), "junk": dict(junk)})
 
         # `vanished` has to survive this door: a vault whose suites were all deleted also
         # lands in "no suites found", and returning 0 here is silence at the exact moment
@@ -795,6 +892,20 @@ def cmd_run(args, vault: Path, details=None) -> int:
             print("   summary in other words, e.g. `Total: n assertions green`.",
                   file=sys.stderr)
             print("=" * 72, file=sys.stderr)
+        if junk and not args.json:
+            print("\n" + "=" * 72, file=sys.stderr)
+            print("JUNK ASSERTIONS - %d suite(s) contain assertions that cannot fail:"
+                  % len(junk), file=sys.stderr)
+            for t in sorted(junk):
+                for hit in junk[t]:
+                    print("   - %s %s" % (t, hit), file=sys.stderr)
+            print("   A constant assert, a value compared with itself, or `report(name, True)`"
+                  " on a straight", file=sys.stderr)
+            print("   path still prints [PASS] and counts as coverage, but catches nothing."
+                  " Compare against an", file=sys.stderr)
+            print("   independent expected value, or delete it. `accept` is no way out.",
+                  file=sys.stderr)
+            print("=" * 72, file=sys.stderr)
 
         if args.json:
             print(json.dumps({"ok": clean and not miscounted
@@ -807,7 +918,7 @@ def cmd_run(args, vault: Path, details=None) -> int:
                               "coverage_dropped": [{"test": t, "was": a, "now": b}
                                                    for t, a, b in dropped],
                               "vanished": list(vanished), "mute": mute,
-                              "double_count": double,
+                              "double_count": double, "junk": junk,
                               "results": [{k: v for k, v in r.items() if k != "output"}
                                           for r in results]}, ensure_ascii=False, indent=1))
         else:
@@ -829,7 +940,8 @@ def cmd_run(args, vault: Path, details=None) -> int:
                 + ("" if not (dropped or vanished) else
                    " - COVERAGE FELL in %d suite(s)" % (len(dropped) + len(vanished)))
                 + ("" if not mute else " - %d MUTE" % len(mute))
-                + ("" if not double else " - %d DOUBLE-COUNTED" % len(double))))
+                + ("" if not double else " - %d DOUBLE-COUNTED" % len(double))
+                + ("" if not junk else " - %d JUNK" % len(junk))))
 
         # Coverage loss BLOCKS, like a red suite. Reporting without blocking would rebuild
         # the very silent channel this measurement exists to close: on the Stop-hook path,
@@ -936,6 +1048,10 @@ def cmd_hook_stop(args) -> int:
         headline = "a tooling suite counts its assertions TWICE - labels plus a roll-up (%s)" \
                    % ", ".join(details["double_count"][:3])
         repair = "Drop the `PASS n/m` roll-up and keep one `[PASS]` label per assertion."
+    elif details.get("junk"):
+        headline = "a tooling suite has assertions that CANNOT FAIL (%s)" % "; ".join(
+            "%s %s" % (t, h) for t in sorted(details["junk"]) for h in details["junk"][t][:3])
+        repair = "Compare against an independent expected value, or delete the assertion."
     elif details.get("coverage_dropped") or details.get("vanished"):
         headline = "tooling test COVERAGE fell since the last green run"
         repair = 'Restore it, or lower the mark on the record: accept --reason "..."'
