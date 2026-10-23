@@ -561,6 +561,57 @@ def junk_assertions(path) -> list:
     return ["line %d: %s" % (n, k) for n, k in sorted(set(hits))]
 
 
+# Without a prefix, `tempfile` names its result `tmp` + 8 random characters. Value: where
+# `prefix` sits among the positional arguments, per the stdlib signature.
+_TEMP_PREFIX_POS = {"TemporaryDirectory": 1, "mkdtemp": 1, "mkstemp": 1, "NamedTemporaryFile": 5}
+
+
+def anonymous_temp(path) -> list:
+    """Parse one tooling file and return the lines that create an ANONYMOUS temp dir/file.
+
+    A `tmp` + 8-character name points at nobody. And when a child process loses its
+    environment (no TEMP/TMP), `gettempdir()` falls back to the current directory - for a
+    vault script, that is the vault root. Leftovers then sit in the knowledge base under a
+    name nobody can trace. A prefix makes any leftover name its culprit.
+
+    Only calls that are certainly `tempfile`'s count: `tempfile.X(...)` (including
+    `import tempfile as t`) or `X(...)` after `from tempfile import X`. A `prefix=` keyword,
+    enough positional arguments to reach `prefix`, or `**kwargs` (unreadable) is not flagged."""
+    try:
+        source = Path(path).read_text(encoding="utf-8", errors="replace")
+        # Both call shapes need an import that contains this word; filtering first skips
+        # parsing most files.
+        if "tempfile" not in source:
+            return []
+        tree = ast.parse(source)
+    except (OSError, SyntaxError, ValueError):
+        return []
+    modules, names = {"tempfile"}, {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules |= {a.asname for a in node.names if a.name == "tempfile" and a.asname}
+        elif isinstance(node, ast.ImportFrom) and node.module == "tempfile":
+            names.update({a.asname or a.name: a.name for a in node.names
+                          if a.name in _TEMP_PREFIX_POS})
+    hits = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        f = node.func
+        if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) \
+                and f.value.id in modules and f.attr in _TEMP_PREFIX_POS:
+            func = f.attr
+        elif isinstance(f, ast.Name) and f.id in names:
+            func = names[f.id]
+        else:
+            continue
+        kw = {k.arg for k in node.keywords}
+        if "prefix" in kw or None in kw or len(node.args) > _TEMP_PREFIX_POS[func]:
+            continue
+        hits.append((node.lineno, func))
+    return ["line %d: %s() without a prefix" % (n, fn) for n, fn in sorted(set(hits))]
+
+
 def coverage_delta(old: dict, new: dict, on_disk) -> tuple:
     """Compare against the last green mark. Returns (dropped, vanished).
 
@@ -747,7 +798,14 @@ def cmd_run(args, vault: Path, details=None) -> int:
         # number to coverage, and accepting it would lock that number into the mark.
         junk = {r["test"]: junk_assertions(r["path"]) for r in results}
         junk = {t: hits for t, hits in junk.items() if hits}
-        miscounted = mute + double + sorted(junk)
+        # Anonymous temp dirs: scan EVERY tooling file, not only the suites that ran - the
+        # culprit is usually a tool, not a test.
+        anon = {}
+        for p in walk_attachments(vault):
+            hits = anonymous_temp(p)
+            if hits:
+                anon[p.relative_to(vault).as_posix()] = hits
+        miscounted = mute + double + sorted(junk) + sorted(anon)
         accepted_ok = False                      # True only once read back from disk
         if details is not None:
             # So the Stop hook can name the actual cause instead of saying "something is
@@ -760,7 +818,8 @@ def cmd_run(args, vault: Path, details=None) -> int:
                             "locked_files": sorted({locked_file(r) for r in locked}),
                             "coverage_dropped": [t for t, _a, _b in dropped],
                             "vanished": list(vanished), "mute": list(mute),
-                            "double_count": list(double), "junk": dict(junk)})
+                            "double_count": list(double), "junk": dict(junk),
+                            "anonymous_temp": dict(anon)})
 
         # `vanished` has to survive this door: a vault whose suites were all deleted also
         # lands in "no suites found", and returning 0 here is silence at the exact moment
@@ -906,6 +965,18 @@ def cmd_run(args, vault: Path, details=None) -> int:
             print("   independent expected value, or delete it. `accept` is no way out.",
                   file=sys.stderr)
             print("=" * 72, file=sys.stderr)
+        if anon and not args.json:
+            print("\n" + "=" * 72, file=sys.stderr)
+            print("ANONYMOUS TEMP DIRS - %d tooling file(s) create a temp dir/file with no"
+                  " prefix:" % len(anon), file=sys.stderr)
+            for t in sorted(anon):
+                for hit in anon[t]:
+                    print("   - %s %s" % (t, hit), file=sys.stderr)
+            print("   A `tmp` + 8-character name points at nobody, and without TEMP/TMP it"
+                  " lands in the", file=sys.stderr)
+            print("   vault root. Fix: pass `prefix=\"<tool-name>-\"`. `accept` is no way out.",
+                  file=sys.stderr)
+            print("=" * 72, file=sys.stderr)
 
         if args.json:
             print(json.dumps({"ok": clean and not miscounted
@@ -919,6 +990,7 @@ def cmd_run(args, vault: Path, details=None) -> int:
                                                    for t, a, b in dropped],
                               "vanished": list(vanished), "mute": mute,
                               "double_count": double, "junk": junk,
+                              "anonymous_temp": anon,
                               "results": [{k: v for k, v in r.items() if k != "output"}
                                           for r in results]}, ensure_ascii=False, indent=1))
         else:
@@ -941,7 +1013,8 @@ def cmd_run(args, vault: Path, details=None) -> int:
                    " - COVERAGE FELL in %d suite(s)" % (len(dropped) + len(vanished)))
                 + ("" if not mute else " - %d MUTE" % len(mute))
                 + ("" if not double else " - %d DOUBLE-COUNTED" % len(double))
-                + ("" if not junk else " - %d JUNK" % len(junk))))
+                + ("" if not junk else " - %d JUNK" % len(junk))
+                + ("" if not anon else " - %d ANONYMOUS TEMP" % len(anon))))
 
         # Coverage loss BLOCKS, like a red suite. Reporting without blocking would rebuild
         # the very silent channel this measurement exists to close: on the Stop-hook path,
@@ -1052,6 +1125,11 @@ def cmd_hook_stop(args) -> int:
         headline = "a tooling suite has assertions that CANNOT FAIL (%s)" % "; ".join(
             "%s %s" % (t, h) for t in sorted(details["junk"]) for h in details["junk"][t][:3])
         repair = "Compare against an independent expected value, or delete the assertion."
+    elif details.get("anonymous_temp"):
+        headline = "a tooling file creates an ANONYMOUS temp dir (%s)" % "; ".join(
+            "%s %s" % (t, h) for t in sorted(details["anonymous_temp"])
+            for h in details["anonymous_temp"][t][:3])
+        repair = 'Pass prefix="<tool-name>-" so any leftover names its culprit.'
     elif details.get("coverage_dropped") or details.get("vanished"):
         headline = "tooling test COVERAGE fell since the last green run"
         repair = 'Restore it, or lower the mark on the record: accept --reason "..."'

@@ -488,6 +488,46 @@ def main() -> int:
         report("36i. try/except, if, f()==f(), x!=x, True as an argument -> not junk",
                code == 0 and "JUNK" not in out, out)
 
+        # --- anonymous temp dirs in a TOOL, not a test --------------------------------
+        # The suite is green and clean; the culprit is the tool next to it. A regex for the
+        # empty call `mkdtemp()` misses every line below except line 5.
+        reset()
+        write_test("test_temp.py", "print('[PASS] clean suite')\n")
+        tool = att() / "make_temp.py"
+        tool.write_text("import tempfile as tf\nfrom tempfile import mkdtemp as md\n"
+                        "tf.mkdtemp(dir='x')\n"
+                        "tf.TemporaryDirectory(suffix='-w')\n"
+                        "md()\n"
+                        # One positional argument is `suffix`, short of `prefix` (1 / 5).
+                        "tf.mkdtemp('-suffix')\n"
+                        "tf.NamedTemporaryFile('w', delete=False)\n", encoding="utf-8")
+        code, out = run(base("run"))
+        report("36j. a tool creating temp dirs with no prefix -> refused, by file and line",
+               code == 1 and "1 ANONYMOUS TEMP" in out
+               and all(s in out for s in ("make_temp.py line 3: mkdtemp()",
+                                          "make_temp.py line 4: TemporaryDirectory()",
+                                          "make_temp.py line 5: mkdtemp()",
+                                          "make_temp.py line 6: mkdtemp()",
+                                          "make_temp.py line 7: NamedTemporaryFile()")), out)
+        report("36k. a run with an anonymous temp dir records no green mark",
+               not state.is_file(), str(state))
+        code, out = run(base("hook-stop"), stdin=stop_payload())
+        report("36l. hook-stop blocks on it and `accept` is no way out",
+               code == 2 and "ANONYMOUS temp dir" in out and "make_temp.py line 3" in out
+               and run(base("accept", "--reason", "let it be"))[0] == 1, out)
+        # Negative control: a prefix by keyword or position, unreadable `**kwargs`, and a
+        # local function that only shares the name `mkdtemp`.
+        tool.write_text("import tempfile\n"
+                        "tempfile.mkdtemp(prefix='kb-')\n"
+                        "tempfile.mkdtemp('', 'kb-')\n"
+                        "tempfile.NamedTemporaryFile('w', prefix='kb-', delete=False)\n"
+                        "tempfile.TemporaryDirectory(**{'prefix': 'kb-'})\n"
+                        "def mkdtemp():\n    return 'x'\n"
+                        "mkdtemp()\n", encoding="utf-8")
+        code, out = run(base("run"))
+        report("36m. prefix by keyword/position, **kwargs, a same-named local -> not anonymous",
+               code == 0 and "ANONYMOUS" not in out, out)
+
         # --- broken measurement: a missing library ----------------------------------
         reset()
         write_test("test_ok.py", TEST_OK)

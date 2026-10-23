@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0] - 2026-10-23
+
+### Added
+- **`tooling_selfcheck.py` refuses anonymous temp directories.** Without a prefix,
+  `tempfile` names its result `tmp` plus eight random characters, which points at nobody.
+  When a child process loses its environment (no TEMP/TMP), `gettempdir()` falls back to the
+  current directory, which for a vault script is the vault root, so a leftover can sit in
+  the knowledge base under a name nobody can trace.
+
+  The runner now parses every tooling file under `attachments/` on each run, not only the
+  suites that ran, because the culprit is usually a tool. It flags `TemporaryDirectory`,
+  `mkdtemp`, `mkstemp` and `NamedTemporaryFile` from `tempfile` (including aliased imports)
+  when there is no `prefix=` and too few positional arguments to reach `prefix`. A call with
+  `**kwargs` is left alone, because its contents cannot be read. It blocks like a mute suite:
+  no green mark, `run` exits 1, the Stop hook exits 2 and names the file and line, and
+  `accept` is no way out. Files are filtered on the word `tempfile` before parsing, so most
+  are never parsed.
+- **Four new cases, 36j-36m, in `test_tooling_selfcheck.py`.** 36j-36l failed on the old
+  code and pass on the change. 36m is the negative control. Four deliberate mutations of the
+  scanner (dropping the keyword/positional exemptions, accepting a bare `mkdtemp` without the
+  import, moving either prefix position to 0) each turn a case red.
+
+### Fixed
+- **Six anonymous temp directories in this repository's own tests.** `test_drift_check.py`
+  (5) and `test_worklist.py` (1) called `tempfile.TemporaryDirectory()` with no prefix. They
+  now pass `harness-kb-drift-` and `harness-kb-worklist-`. The new scanner finds exactly
+  those six lines on the previous release and none on this one.
+
 ## [1.27.0] - 2026-10-23
 
 ### Added
@@ -1371,6 +1399,7 @@ caught it.
   routine template, and a runnable demo vault.
 - MIT license.
 
+[1.28.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.28.0
 [1.27.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.27.0
 [1.26.1]: https://github.com/chuong1224/harness-kb/releases/tag/v1.26.1
 [1.26.0]: https://github.com/chuong1224/harness-kb/releases/tag/v1.26.0

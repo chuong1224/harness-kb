@@ -95,7 +95,7 @@ class WorklistTests(unittest.TestCase):
         self.assertTrue(short["truncated"])
 
     def test_cli_writes_only_the_requested_artifact(self):
-        with tempfile.TemporaryDirectory() as raw:
+        with tempfile.TemporaryDirectory(prefix="harness-kb-worklist-") as raw:
             root = Path(raw)
             snapshot = root / "snapshot.json"
             output = root / "worklist.json"

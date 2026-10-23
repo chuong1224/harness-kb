@@ -3,7 +3,7 @@
 **A blueprint for building a knowledge base that maintains itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.27.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.28.0-blue.svg)](./CHANGELOG.md)
 [![Docs](https://img.shields.io/badge/docs-blueprint-blue.svg)](./docs/blueprint.md)
 [![Dependencies](https://img.shields.io/badge/deps-stdlib%20%2B%201%20optional-brightgreen.svg)](#dependencies)
 
@@ -265,7 +265,7 @@ python examples/scripts/tooling_selfcheck.py run --vault /path/to/your/vault
 #     A suite that asserts nothing, or counts each assertion twice (a `[PASS]` label per
 #     assertion plus a `PASS n/m` roll-up of the same ones), is refused outright, and so is
 #     an assertion that cannot fail (`assert True`, `x == x`, `report(name, True)` on a
-#     straight path):
+#     straight path). Any tooling file that creates a temp dir with no prefix is refused too:
 python examples/scripts/tooling_selfcheck.py accept --reason "merged two redundant cases" \
     --vault /path/to/your/vault
 

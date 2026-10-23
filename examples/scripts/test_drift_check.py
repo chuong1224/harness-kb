@@ -57,7 +57,7 @@ def sandbox(tmp: Path):
 
 def case(name, mutate, expected):
     """mutate(vault, rules) breaks one thing; the checker must exit 1 and say `expected`."""
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(prefix="harness-kb-drift-") as tmp:
         vault, rules = sandbox(Path(tmp))
         mutate(vault, rules)
         code, out = run(vault, rules)
@@ -70,7 +70,7 @@ def clean_case(name, mutate):
     Worth its own helper because "the checker stayed quiet" is only meaningful next to a
     case proving it would have spoken - see the pair below about `attachments/`.
     """
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(prefix="harness-kb-drift-") as tmp:
         vault, rules = sandbox(Path(tmp))
         mutate(vault, rules)
         code, out = run(vault, rules)
@@ -81,7 +81,7 @@ def warn_case(name, mutate, expected, baseline_out):
     """A warning keeps the exit code at 0, so the exit code proves nothing here. Demand the
     warning appears after the mutation AND is absent from the untouched baseline - otherwise
     a dead check passes because some other line already happened to print the same text."""
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(prefix="harness-kb-drift-") as tmp:
         vault, rules = sandbox(Path(tmp))
         mutate(vault, rules)
         code, out = run(vault, rules)
@@ -106,7 +106,7 @@ def replace_in(path: Path, old: str, new: str):
 
 def show_facts():
     """The demo vault's own counts, read from the checker - never hard-coded here."""
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(prefix="harness-kb-drift-") as tmp:
         vault, rules = sandbox(Path(tmp))
         proc = subprocess.run(
             [sys.executable, str(CHECKER), str(vault), "--rules", str(rules), "--show"],
@@ -116,7 +116,7 @@ def show_facts():
 
 def main() -> int:
     facts = show_facts()
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(prefix="harness-kb-drift-") as tmp:
         vault, rules = sandbox(Path(tmp))
         code, out = run(vault, rules)
         report("baseline: unmodified demo vault has no drift", code == 0, out)
